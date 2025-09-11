@@ -243,20 +243,20 @@ class ODataClient:
         select : list[str] | None
             Columns to select; joined with commas into $select.
         filter : str | None
-            ``$filter`` expression.
+            OData $filter expression as a string.
         orderby : list[str] | None
             Order expressions; joined with commas into $orderby.
         top : int | None
-            Global cap via ``$top`` (applied on first request; server enforces across pages).
+            Max number of records across all pages. Passed as $top on the first request; the server will paginate via nextLink as needed.
         expand : list[str] | None
-            Navigation expansions -> ``$expand``; raw clauses accepted.
+            Navigation properties to expand; joined with commas into $expand.
         page_size : int | None
             Hint for per-page size using Prefer: ``odata.maxpagesize``.
 
         Yields
         ------
         list[dict]
-            A non-empty page of entities (service ``value`` array). Empty pages are skipped.
+            A page of records from the Web API (the "value" array for each page).
         """
 
         headers = self._headers().copy()

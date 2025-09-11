@@ -129,7 +129,7 @@ Notes:
 - Single-record `create` still returns the full entity representation.
 - `@odata.type` handling: If any payload in the list omits `@odata.type`, the SDK performs a one-time metadata query (`EntityDefinitions?$filter=EntitySetName eq '<entity_set>'`) to resolve the logical name, caches it, and stamps each missing item with `Microsoft.Dynamics.CRM.<logical>`. If **all** payloads already include `@odata.type`, no metadata call is made.
 - The metadata lookup is per entity set and reused across subsequent multi-create calls in the same client instance (in-memory cache only).
-- You can explicitly set `@odata.type` yourself (e.g., for polymorphic scenarios); the SDK will not override it.
+
 
 ## Retrieve multiple with paging
 
@@ -162,6 +162,9 @@ Parameters (all optional except `entity_set`)
 - `page_size`: int | None — Per-page hint using Prefer: `odata.maxpagesize=<N>` (not guaranteed; last page may be smaller).
 
 Return value & semantics
+- `$select`, `$filter`, `$orderby`, `$expand`, `$top` map directly to corresponding OData query options on the first request.
+- `$top` caps total rows; the service may partition those rows across multiple pages.
+- `page_size` (Prefer: `odata.maxpagesize`) is a hint; the server decides actual page boundaries.
 - Returns a generator yielding non-empty pages (`list[dict]`). Empty pages are skipped.
 - Each yielded list corresponds to a `value` page from the Web API.
 - Iteration stops when no `@odata.nextLink` remains (or when `$top` satisfied server-side).
@@ -199,13 +202,6 @@ for page in pages:  # page is list[dict]
 		print({"page_size": len(page)})
 ```
 
-Semantics:
-- `$select`, `$filter`, `$orderby`, `$expand`, `$top` map directly to corresponding OData query options on the first request.
-- `$top` caps total rows; the service may partition those rows across multiple pages.
-- `page_size` (Prefer: `odata.maxpagesize`) is a hint; the server decides actual page boundaries.
-- The generator follows `@odata.nextLink` until exhausted (service already accounts for `$top`).
-- Only non-empty pages are yielded; if the first response has no `value`, iteration ends immediately.
-```
 
 ### Custom table (metadata) example
 
@@ -257,7 +253,7 @@ VS Code Tasks
 - No general-purpose OData batching, upsert, or association operations yet.
 - `DeleteMultiple`/`UpdateMultiple` are not exposed; quickstart may demonstrate faster deletes using client-side concurrency only.
 - Minimal retry policy in library (network-error only); examples include additional backoff for transient Dataverse consistency.
-- Entity naming conventions in Dataverse (schema/logical/entity set plural & publisher prefix) are only partially abstracted; for multi-create the SDK resolves logical names from entity set metadata.
+- Entity naming conventions in Dataverse: for multi-create the SDK resolves logical names from entity set metadata.
 
 ## Contributing
 
