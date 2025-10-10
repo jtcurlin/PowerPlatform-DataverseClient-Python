@@ -35,8 +35,8 @@ Auth:
 | `get` | `get(entity_set, id)` | `dict` | One record; supply GUID (with/without parentheses). |
 | `get_multiple` | `get_multiple(entity_set, ..., page_size=None)` | `Iterable[list[dict]]` | Pages yielded (non-empty only). |
 | `update` | `update(entity_set, id, patch)` | `None` | Single update; no representation returned. |
-| `update` | `update(entity_set, list[id], patch)` | `None` | Broadcast; same patch applied to all IDs. |
-| `update` | `update(entity_set, list[id], list[patch])` | `None` | 1:1 patches; lengths must match. |
+| `update` | `update(entity_set, list[id], patch)` | `None` | Broadcast; same patch applied to all IDs. Calls UpdateMultiple web API internally. |
+| `update` | `update(entity_set, list[id], list[patch])` | `None` | 1:1 patches; lengths must match. Calls UpdateMultiple web API internally. |
 | `delete` | `delete(entity_set, id)` | `None` | Delete one record. |
 | `delete` | `delete(entity_set, list[id])` | `None` | Delete many (sequential). |
 | `query_sql` | `query_sql(sql)` | `list[dict]` | Constrained read-only SELECT via `?sql=`. |
@@ -50,9 +50,9 @@ Auth:
 | `PandasODataClient.query_sql_df` | `query_sql_df(sql)` | `DataFrame` | DataFrame for SQL results. |
 
 Guidelines:
-- `create` always returns a list of GUIDs (1 for single, N for multi).
+- `create` always returns a list of GUIDs (1 for single, N for bulk).
 - `update`/`delete` always return `None` (single and multi forms).
-- Multi-update chooses broadcast vs per-record by the type of `changes` (dict vs list).
+- Bulk update chooses broadcast vs per-record by the type of `changes` (dict vs list).
 - Paging and SQL operations never mutate inputs.
 - Metadata lookups for logical name stamping cached per entity set (in-memory).
 
@@ -132,14 +132,14 @@ account = client.get("accounts", account_id)
 # Update (returns None)
 client.update("accounts", account_id, {"telephone1": "555-0199"})
 
-# Multi-update (broadcast) – apply same patch to several IDs
+# Bulk update (broadcast) – apply same patch to several IDs
 ids = client.create("accounts", [
 	{"name": "Contoso"},
 	{"name": "Fabrikam"},
 ])
 client.update("accounts", ids, {"telephone1": "555-0200"})  # broadcast patch
 
-# Multi-update (1:1) – list of patches matches list of IDs
+# Bulk update (1:1) – list of patches matches list of IDs
 client.update("accounts", ids, [
 	{"telephone1": "555-1200"},
 	{"telephone1": "555-1300"},
@@ -170,7 +170,7 @@ assert isinstance(ids, list) and all(isinstance(x, str) for x in ids)
 print({"created_ids": ids})
 ```
 
-## Multi-update (UpdateMultiple under the hood)
+## Bulk update (UpdateMultiple under the hood)
 
 Use the unified `update` method for both single and bulk scenarios:
 
@@ -320,7 +320,7 @@ VS Code Tasks
 - No general-purpose OData batching, upsert, or association operations yet.
 - `DeleteMultiple` not yet exposed.
 - Minimal retry policy in library (network-error only); examples include additional backoff for transient Dataverse consistency.
-- Entity naming conventions in Dataverse: for multi-create the SDK resolves logical names from entity set metadata.
+- Entity naming conventions in Dataverse: for bulk create the SDK resolves logical names from entity set metadata.
 
 ## Contributing
 

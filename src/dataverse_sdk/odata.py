@@ -34,6 +34,10 @@ class ODataClient:
         self._entityset_logical_cache = {}
         # Cache: logical name -> entity set name (reverse lookup for SQL endpoint)
         self._logical_to_entityset_cache: dict[str, str] = {}
+        # Cache: entity set name -> primary id attribute (metadata PrimaryIdAttribute)
+        self._entityset_primaryid_cache: dict[str, str] = {}
+        # Cache: logical name -> primary id attribute
+        self._logical_primaryid_cache: dict[str, str] = {}
 
     def _headers(self) -> Dict[str, str]:
         """Build standard OData headers with bearer auth."""
@@ -51,7 +55,7 @@ class ODataClient:
         return self._http.request(method, url, **kwargs)
 
     # ----------------------------- CRUD ---------------------------------
-    def create(self, entity_set: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[str, List[str]]:
+    def _create(self, entity_set: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[str, List[str]]:
         """Create one or many records.
 
         Parameters
@@ -122,7 +126,7 @@ class ODataClient:
         # Escape single quotes in entity set name
         es_escaped = self._escape_odata_quotes(es)
         params = {
-            "$select": "LogicalName,EntitySetName",
+            "$select": "LogicalName,EntitySetName,PrimaryIdAttribute",
             "$filter": f"EntitySetName eq '{es_escaped}'",
         }
         r = self._request("get", url, headers=self._headers(), params=params)
@@ -134,10 +138,15 @@ class ODataClient:
             items = []
         if not items:
             raise RuntimeError(f"Unable to resolve logical name for entity set '{es}'. Provide @odata.type explicitly.")
-        logical = items[0].get("LogicalName")
+        md = items[0]
+        logical = md.get("LogicalName")
         if not logical:
             raise RuntimeError(f"Metadata response missing LogicalName for entity set '{es}'.")
+        primary_id_attr = md.get("PrimaryIdAttribute")
         self._entityset_logical_cache[es] = logical
+        if isinstance(primary_id_attr, str) and primary_id_attr:
+            self._entityset_primaryid_cache[es] = primary_id_attr
+            self._logical_primaryid_cache[logical] = primary_id_attr
         return logical
 
     def _create_multiple(self, entity_set: str, records: List[Dict[str, Any]]) -> List[str]:
@@ -189,15 +198,17 @@ class ODataClient:
 
     # --- Derived helpers for high-level client ergonomics ---
     def _primary_id_attr(self, entity_set: str) -> str:
-        """Return the primary id attribute name for an entity set.
-
-        Currently derived as <logicalname>id (e.g. account -> accountid).
-        Centralizing here allows future enhancement (metadata-driven or alternate key support).
-        """
+        """Return primary key attribute using metadata (fallback to <logical>id)."""
+        pid = self._entityset_primaryid_cache.get(entity_set)
+        if pid:
+            return pid
         logical = self._logical_from_entity_set(entity_set)
+        pid = self._entityset_primaryid_cache.get(entity_set) or self._logical_primaryid_cache.get(logical)
+        if pid:
+            return pid
         return f"{logical}id"
 
-    def update_by_ids(self, entity_set: str, ids: List[str], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
+    def _update_by_ids(self, entity_set: str, ids: List[str], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
         """Update many records by GUID list using UpdateMultiple under the hood.
 
         Parameters
@@ -216,7 +227,7 @@ class ODataClient:
         pk_attr = self._primary_id_attr(entity_set)
         if isinstance(changes, dict):
             batch = [{pk_attr: rid, **changes} for rid in ids]
-            self.update_multiple(entity_set, batch)
+            self._update_multiple(entity_set, batch)
             return None
         if not isinstance(changes, list):
             raise TypeError("changes must be dict or list[dict]")
@@ -227,10 +238,10 @@ class ODataClient:
             if not isinstance(patch, dict):
                 raise TypeError("Each patch must be a dict")
             batch.append({pk_attr: rid, **patch})
-        self.update_multiple(entity_set, batch)
+        self._update_multiple(entity_set, batch)
         return None
 
-    def delete_many(self, entity_set: str, ids: List[str]) -> None:
+    def _delete_multiple(self, entity_set: str, ids: List[str]) -> None:
         """Delete many records by GUID list (simple loop; potential future optimization point)."""
         if not isinstance(ids, list):
             raise TypeError("ids must be list[str]")
@@ -253,7 +264,7 @@ class ODataClient:
             return f"({k})"
         return f"({k})"
 
-    def update(self, entity_set: str, key: str, data: Dict[str, Any]) -> None:
+    def _update(self, entity_set: str, key: str, data: Dict[str, Any]) -> None:
         """Update an existing record.
 
         Parameters
@@ -275,7 +286,7 @@ class ODataClient:
         r = self._request("patch", url, headers=headers, json=data)
         r.raise_for_status()
 
-    def update_multiple(self, entity_set: str, records: List[Dict[str, Any]]) -> None:
+    def _update_multiple(self, entity_set: str, records: List[Dict[str, Any]]) -> None:
         """Bulk update existing records via the collection-bound UpdateMultiple action.
 
         Parameters
@@ -325,10 +336,10 @@ class ODataClient:
         headers = self._headers().copy()
         r = self._request("post", url, headers=headers, json=payload)
         r.raise_for_status()
-    # Intentionally ignore response content: no stable contract for IDs across environments.
+        # Intentionally ignore response content: no stable contract for IDs across environments.
         return None
 
-    def delete(self, entity_set: str, key: str) -> None:
+    def _delete(self, entity_set: str, key: str) -> None:
         """Delete a record by GUID or alternate key."""
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         headers = self._headers().copy()
@@ -336,7 +347,7 @@ class ODataClient:
         r = self._request("delete", url, headers=headers)
         r.raise_for_status()
 
-    def get(self, entity_set: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
+    def _get(self, entity_set: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
         """Retrieve a single record.
 
         Parameters
@@ -356,7 +367,7 @@ class ODataClient:
         r.raise_for_status()
         return r.json()
 
-    def get_multiple(
+    def _get_multiple(
         self,
         entity_set: str,
         select: Optional[List[str]] = None,
@@ -435,7 +446,7 @@ class ODataClient:
             next_link = data.get("@odata.nextLink") or data.get("odata.nextLink") if isinstance(data, dict) else None
 
     # --------------------------- SQL Custom API -------------------------
-    def query_sql(self, sql: str) -> list[dict[str, Any]]:
+    def _query_sql(self, sql: str) -> list[dict[str, Any]]:
         """Execute a read-only SQL query using the Dataverse Web API `?sql=` capability.
 
         The platform supports a constrained subset of SQL SELECT statements directly on entity set endpoints:
@@ -532,7 +543,7 @@ class ODataClient:
         url = f"{self.api}/EntityDefinitions"
         logical_escaped = self._escape_odata_quotes(logical)
         params = {
-            "$select": "LogicalName,EntitySetName",
+            "$select": "LogicalName,EntitySetName,PrimaryIdAttribute",
             "$filter": f"LogicalName eq '{logical_escaped}'",
         }
         r = self._request("get", url, headers=self._headers(), params=params)
@@ -544,10 +555,15 @@ class ODataClient:
             items = []
         if not items:
             raise RuntimeError(f"Unable to resolve entity set for logical name '{logical}'.")
-        es = items[0].get("EntitySetName")
+        md = items[0]
+        es = md.get("EntitySetName")
         if not es:
             raise RuntimeError(f"Metadata response missing EntitySetName for logical '{logical}'.")
         self._logical_to_entityset_cache[logical] = es
+        primary_id_attr = md.get("PrimaryIdAttribute")
+        if isinstance(primary_id_attr, str) and primary_id_attr:
+            self._logical_primaryid_cache[logical] = primary_id_attr
+            self._entityset_primaryid_cache[es] = primary_id_attr
         return es
 
     # ---------------------- Table metadata helpers ----------------------
@@ -690,7 +706,7 @@ class ODataClient:
             }
         return None
 
-    def get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
+    def _get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
         """Return basic metadata for a custom table if it exists.
 
         Parameters
@@ -714,7 +730,7 @@ class ODataClient:
             "columns_created": [],
         }
     
-    def list_tables(self) -> List[Dict[str, Any]]:
+    def _list_tables(self) -> List[Dict[str, Any]]:
         """List all tables in the Dataverse, excluding private tables (IsPrivate=true)."""
         url = f"{self.api}/EntityDefinitions"
         params = {
@@ -724,7 +740,7 @@ class ODataClient:
         r.raise_for_status()
         return r.json().get("value", [])
 
-    def delete_table(self, tablename: str) -> None:
+    def _delete_table(self, tablename: str) -> None:
         schema_name = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"
         entity_schema = schema_name
         ent = self._get_entity_by_schema(entity_schema)
@@ -736,7 +752,7 @@ class ODataClient:
         r = self._request("delete", url, headers=headers)
         r.raise_for_status()
 
-    def create_table(self, tablename: str, schema: Dict[str, str]) -> Dict[str, Any]:
+    def _create_table(self, tablename: str, schema: Dict[str, str]) -> Dict[str, Any]:
         # Accept a friendly name and construct a default schema under 'new_'.
         # If a full SchemaName is passed (contains '_'), use as-is.
         entity_schema = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"

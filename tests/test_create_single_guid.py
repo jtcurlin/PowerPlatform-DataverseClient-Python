@@ -25,7 +25,6 @@ class TestableOData(ODataClient):
         # Monkey-patch http client
         self._http = types.SimpleNamespace(request=lambda method, url, **kwargs: DummyHTTP(headers).request(method, url, **kwargs))
 
-
 def test__create_single_uses_odata_entityid():
     guid = "11111111-2222-3333-4444-555555555555"
     headers = {"OData-EntityId": f"https://org.example/api/data/v9.2/accounts({guid})"}
@@ -33,14 +32,12 @@ def test__create_single_uses_odata_entityid():
     result = c._create_single("accounts", {"name": "x"})
     assert result == guid
 
-
 def test__create_single_fallback_location():
     guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     headers = {"Location": f"https://org.example/api/data/v9.2/contacts({guid})"}
     c = TestableOData(headers)
     result = c._create_single("contacts", {"firstname": "x"})
     assert result == guid
-
 
 def test__create_single_missing_headers_raises():
     c = TestableOData({})

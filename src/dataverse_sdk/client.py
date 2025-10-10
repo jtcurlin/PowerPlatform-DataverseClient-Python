@@ -80,12 +80,15 @@ class DataverseClient:
         """
         od = self._get_odata()
         if isinstance(records, dict):
-            rid = od.create(entity, records)  # low-level guarantees GUID str for single
+            rid = od._create_single(entity, records)
             if not isinstance(rid, str):
-                raise TypeError("Low-level create did not return GUID string for single record")
+                raise TypeError("_create_single did not return GUID string")
             return [rid]
         if isinstance(records, list):
-            return od.create(entity, records)  # multi path returns list[str]
+            ids = od._create_multiple(entity, records)
+            if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
+                raise TypeError("_create_multiple did not return list[str]")
+            return ids
         raise TypeError("records must be dict or list[dict]")
 
     def update(self, entity: str, ids: Union[str, List[str]], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
@@ -105,22 +108,22 @@ class DataverseClient:
         if isinstance(ids, str):
             if not isinstance(changes, dict):
                 raise TypeError("For single id, changes must be a dict")
-            od.update(entity, ids, changes)  # discard representation
+            od._update(entity, ids, changes)  # discard representation
             return None
         if not isinstance(ids, list):
             raise TypeError("ids must be str or list[str]")
-        od.update_by_ids(entity, ids, changes)
+        od._update_by_ids(entity, ids, changes)
         return None
 
     def delete(self, entity: str, ids: Union[str, List[str]]) -> None:
         """Delete one or many records (GUIDs). Returns None."""
         od = self._get_odata()
         if isinstance(ids, str):
-            od.delete(entity, ids)
+            od._delete(entity, ids)
             return None
         if not isinstance(ids, list):
             raise TypeError("ids must be str or list[str]")
-        od.delete_many(entity, ids)
+        od._delete_multiple(entity, ids)
         return None
 
     def get(self, entity: str, record_id: str) -> dict:
@@ -138,7 +141,7 @@ class DataverseClient:
         dict
             The record JSON payload.
         """
-        return self._get_odata().get(entity, record_id)
+        return self._get_odata()._get(entity, record_id)
 
     def get_multiple(
         self,
@@ -155,7 +158,7 @@ class DataverseClient:
         Yields a list of records per page, following @odata.nextLink until exhausted.
         Parameters mirror standard OData query options.
         """
-        return self._get_odata().get_multiple(
+        return self._get_odata()._get_multiple(
             entity,
             select=select,
             filter=filter,
@@ -183,7 +186,7 @@ class DataverseClient:
         list[dict]
             Result rows (empty list if none).
         """
-        return self._get_odata().query_sql(sql)
+        return self._get_odata()._query_sql(sql)
 
     # Table metadata helpers
     def get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
@@ -201,7 +204,7 @@ class DataverseClient:
             Dict with keys like ``entity_schema``, ``entity_logical_name``,
             ``entity_set_name``, and ``metadata_id``; ``None`` if not found.
         """
-        return self._get_odata().get_table_info(tablename)
+        return self._get_odata()._get_table_info(tablename)
 
     def create_table(self, tablename: str, schema: Dict[str, str]) -> Dict[str, Any]:
         """Create a simple custom table.
@@ -220,7 +223,7 @@ class DataverseClient:
             Metadata summary including ``entity_schema``, ``entity_set_name``,
             ``entity_logical_name``, ``metadata_id``, and ``columns_created``.
         """
-        return self._get_odata().create_table(tablename, schema)
+        return self._get_odata()._create_table(tablename, schema)
 
     def delete_table(self, tablename: str) -> None:
         """Delete a custom table by name.
@@ -230,7 +233,7 @@ class DataverseClient:
         tablename : str
             Friendly name (``"SampleItem"``) or a full schema name (``"new_SampleItem"``).
         """
-        self._get_odata().delete_table(tablename)
+        self._get_odata()._delete_table(tablename)
 
     def list_tables(self) -> list[str]:
         """List all custom tables in the Dataverse environment.
@@ -240,8 +243,8 @@ class DataverseClient:
         list[str]
             A list of table names.
         """
-        return self._get_odata().list_tables()
+        return self._get_odata()._list_tables()
 
 
 __all__ = ["DataverseClient"]
-        
+
