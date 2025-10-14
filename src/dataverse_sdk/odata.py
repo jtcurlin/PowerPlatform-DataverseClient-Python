@@ -758,8 +758,6 @@ class ODataClient:
             self._picklist_label_cache = {}
         if cache_key in self._picklist_label_cache:
             return self._picklist_label_cache[cache_key]
-        debug_attr = attr_logical.lower().endswith("_status")
-
         attr_esc = self._escape_odata_quotes(attr_logical)
         logical_esc = self._escape_odata_quotes(logical)
 
@@ -769,11 +767,6 @@ class ODataClient:
             f"?$filter=LogicalName eq '{attr_esc}'&$select=LogicalName,AttributeType"
         )
         r_type = self._request("get", url_type, headers=self._headers())
-        if debug_attr:
-            try:
-                print({"debug_picklist_probe_type": {"attr": attr_logical, "status": r_type.status_code}})
-            except Exception:
-                pass
         if r_type.status_code == 404:
             # Do not permanently cache negative result; metadata may appear later.
             return None
@@ -783,11 +776,6 @@ class ODataClient:
         if not items:
             return None
         attr_md = items[0]
-        if debug_attr:
-            try:
-                print({"debug_picklist_attr_type": attr_md.get("AttributeType")})
-            except Exception:
-                pass
         if attr_md.get("AttributeType") not in ("Picklist", "PickList"):
             return None
 
@@ -798,11 +786,6 @@ class ODataClient:
             "Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)"
         )
         r_opts = self._request("get", cast_url, headers=self._headers())
-        if debug_attr:
-            try:
-                print({"debug_picklist_cast_fetch": {"status": r_opts.status_code}})
-            except Exception:
-                pass
         if r_opts.status_code == 404:
             # Fallback: try non-cast form (older behaviour) just in case environment differs
             alt_url = (
@@ -826,11 +809,6 @@ class ODataClient:
         options = option_set.get("Options") if isinstance(option_set, dict) else None
         if not isinstance(options, list):
             return None
-        if debug_attr:
-            try:
-                print({"debug_picklist_options_count": len(options)})
-            except Exception:
-                pass
         mapping: Dict[str, int] = {}
         for opt in options:
             if not isinstance(opt, dict):
@@ -847,11 +825,6 @@ class ODataClient:
                         if isinstance(lab, str) and lab.strip():
                             normalized = self._normalize_picklist_label(lab)
                             mapping.setdefault(normalized, val)
-        if debug_attr:
-            try:
-                print({"debug_picklist_mapping_keys": sorted(mapping.keys())})
-            except Exception:
-                pass
         if mapping:
             self._picklist_label_cache[cache_key] = mapping
             return mapping
