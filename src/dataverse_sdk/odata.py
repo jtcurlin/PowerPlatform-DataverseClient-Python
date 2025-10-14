@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, List, Union, Iterable
 from enum import Enum
 import unicodedata
+import time
 import re
 import json
 
@@ -40,6 +41,8 @@ class ODataClient:
         self._entityset_primaryid_cache: dict[str, str] = {}
         # Cache: logical name -> primary id attribute
         self._logical_primaryid_cache: dict[str, str] = {}
+        # Cache: (logical_name, attribute_logical) -> {normalized_label: option_value}
+        self._picklist_label_cache = {}
 
     def _headers(self) -> Dict[str, str]:
         """Build standard OData headers with bearer auth."""
@@ -663,10 +666,10 @@ class ODataClient:
             "LocalizedLabels": locs,
         }
 
-    def _enum_optionset_payload(self, schema_name: str, enum_cls: type[Enum], *, is_primary_name: bool = False) -> Dict[str, Any]:
+    def _enum_optionset_payload(self, schema_name: str, enum_cls: type[Enum], is_primary_name: bool = False) -> Dict[str, Any]:
         """Create local (IsGlobal=False) PicklistAttributeMetadata from an Enum subclass.
 
-        Supported translation mapping via optional class attribute `__labels__`:
+        Supports translation mapping via optional class attribute `__labels__`:
             __labels__ = { 1033: { "Active": "Active", "Inactive": "Inactive" },
                            1036: { "Active": "Actif",  "Inactive": "Inactif" } }
 
@@ -674,23 +677,34 @@ class ODataClient:
         If a language lacks a label for a member, member.name is used as fallback.
         The client's configured language code is always ensured to exist.
         """
-        members = list(enum_cls)
-        if not members:
+        all_member_items = list(enum_cls.__members__.items())
+        if not all_member_items:
             raise ValueError(f"Enum {enum_cls.__name__} has no members")
-        # Validate integer values & uniqueness
-        seen_vals: set[int] = set()
+
+        # Duplicate detection
+        value_to_first_name: Dict[int, str] = {}
+        for name, member in all_member_items:
+            val = getattr(member, "value", None)
+            # Defer non-int validation to later loop for consistency
+            if val in value_to_first_name and value_to_first_name[val] != name:
+                raise ValueError(
+                    f"Duplicate enum value {val} in {enum_cls.__name__} (names: {value_to_first_name[val]}, {name})"
+                )
+            value_to_first_name[val] = name
+
+        members = list(enum_cls)
+        # Validate integer values
         for m in members:
             if not isinstance(m.value, int):
                 raise ValueError(f"Enum member '{m.name}' has non-int value '{m.value}' (only int values supported)")
-            if m.value in seen_vals:
-                raise ValueError(f"Duplicate enum value {m.value} in {enum_cls.__name__}")
-            seen_vals.add(m.value)
 
         raw_labels = getattr(enum_cls, "__labels__", None)
         labels_by_lang: Dict[int, Dict[str, str]] = {}
         if raw_labels is not None:
             if not isinstance(raw_labels, dict):
                 raise ValueError("__labels__ must be a dict {lang:int -> {member: label}}")
+            # Build a helper map for value -> member name to resolve raw int keys
+            value_to_name = {m.value: m.name for m in members}
             for lang, mapping in raw_labels.items():
                 if not isinstance(lang, int):
                     raise ValueError("Language codes in __labels__ must be ints")
@@ -698,7 +712,15 @@ class ODataClient:
                     raise ValueError(f"__labels__[{lang}] must be a dict of member names to strings")
                 labels_by_lang.setdefault(lang, {})
                 for k, v in mapping.items():
-                    member_name = k.name if isinstance(k, enum_cls) else str(k)
+                    # Accept enum member object, its name, or raw int value (from class body reference)
+                    if isinstance(k, enum_cls):
+                        member_name = k.name
+                    elif isinstance(k, int):
+                        member_name = value_to_name.get(k)
+                        if member_name is None:
+                            raise ValueError(f"__labels__[{lang}] has int key {k} not matching any enum value")
+                    else:
+                        member_name = str(k)
                     if not isinstance(v, str) or not v.strip():
                         raise ValueError(f"Label for {member_name} lang {lang} must be non-empty string")
                     labels_by_lang[lang][member_name] = v
@@ -733,7 +755,6 @@ class ODataClient:
             },
         }
 
-    # ---------------------- Picklist label coercion ----------------------
     def _normalize_picklist_label(self, label: str) -> str:
         """Normalize a label for case / diacritic insensitive comparison."""
         if not isinstance(label, str):
@@ -754,9 +775,8 @@ class ODataClient:
             return None
         logical = self._logical_from_entity_set(entity_set)
         cache_key = (logical, attr_logical.lower())
-        if not hasattr(self, "_picklist_label_cache"):
-            self._picklist_label_cache = {}
         if cache_key in self._picklist_label_cache:
+            # Empty dict cached => known non-picklist (negative cache sentinel)
             return self._picklist_label_cache[cache_key]
         attr_esc = self._escape_odata_quotes(attr_logical)
         logical_esc = self._escape_odata_quotes(logical)
@@ -766,18 +786,31 @@ class ODataClient:
             f"{self.api}/EntityDefinitions(LogicalName='{logical_esc}')/Attributes"
             f"?$filter=LogicalName eq '{attr_esc}'&$select=LogicalName,AttributeType"
         )
-        r_type = self._request("get", url_type, headers=self._headers())
+        # Retry up to 3 times on 404 (new or not-yet-published attribute metadata). If still 404, raise.
+        r_type = None
+        for attempt in range(3):
+            r_type = self._request("get", url_type, headers=self._headers())
+            if r_type.status_code != 404:
+                break
+            if attempt < 2:
+                # Exponential-ish backoff: 0.4s, 0.8s
+                time.sleep(0.4 * (2 ** attempt))
         if r_type.status_code == 404:
-            # Do not permanently cache negative result; metadata may appear later.
-            return None
+            # After retries we still cannot find the attribute definition – treat as fatal so caller sees a clear error.
+            raise RuntimeError(
+                f"Picklist attribute metadata not found after retries: entity='{logical}' attribute='{attr_logical}' (404)"
+            )
         r_type.raise_for_status()
+        
         body_type = r_type.json()
         items = body_type.get("value", []) if isinstance(body_type, dict) else []
         if not items:
             return None
         attr_md = items[0]
         if attr_md.get("AttributeType") not in ("Picklist", "PickList"):
-            return None
+            # Negative cache sentinel: attribute confirmed not a picklist; avoid future metadata calls
+            self._picklist_label_cache[cache_key] = {}
+            return self._picklist_label_cache[cache_key]
 
         # Step 2: fetch with expand only now that we know it's a picklist
         # Need to cast to the derived PicklistAttributeMetadata type; OptionSet is not a nav on base AttributeMetadata.
@@ -785,21 +818,18 @@ class ODataClient:
             f"{self.api}/EntityDefinitions(LogicalName='{logical_esc}')/Attributes(LogicalName='{attr_esc}')/"
             "Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)"
         )
-        r_opts = self._request("get", cast_url, headers=self._headers())
+        # Step 2 fetch with retries: expanded OptionSet (cast form first)
+        r_opts = None
+        for attempt in range(3):
+            r_opts = self._request("get", cast_url, headers=self._headers())
+            if r_opts.status_code != 404:
+                break
+            if attempt < 2:
+                time.sleep(0.4 * (2 ** attempt))  # 0.4s, 0.8s
         if r_opts.status_code == 404:
-            # Fallback: try non-cast form (older behaviour) just in case environment differs
-            alt_url = (
-                f"{self.api}/EntityDefinitions(LogicalName='{logical_esc}')/Attributes(LogicalName='{attr_esc}')"
-                f"?$select=LogicalName&$expand=OptionSet($select=Options)"
-            )
-            r_opts = self._request("get", alt_url, headers=self._headers())
-            if r_opts.status_code == 404:
-                return None
-        try:
-            r_opts.raise_for_status()
-        except Exception:
-            # If expansion still fails, skip caching negative to allow future retry.
-            return None
+            raise RuntimeError(f"Picklist OptionSet metadata not found after retries: entity='{logical}' attribute='{attr_logical}' (404)")
+        r_opts.raise_for_status()
+        
         attr_full = {}
         try:
             attr_full = r_opts.json() if r_opts.text else {}

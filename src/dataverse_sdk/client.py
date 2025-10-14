@@ -216,8 +216,8 @@ class DataverseClient:
         schema : dict[str, Any]
             Column definitions mapping logical names (without prefix) to types.
             Supported:
-              - Primitive type tokens: ``string``, ``int``, ``decimal``, ``float``, ``datetime``, ``bool``
-              - Enum subclass (IntEnum preferred): generates a local option set with each member value.
+              - Primitive types: ``string``, ``int``, ``decimal``, ``float``, ``datetime``, ``bool``
+              - Enum subclass (IntEnum preferred): generates a local option set.
                 Optional multilingual labels via ``__labels__ = {1033: {"Active": "Active"}, 1036: {"Active": "Actif"}}``
 
         Returns
