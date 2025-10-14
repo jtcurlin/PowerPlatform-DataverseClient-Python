@@ -82,10 +82,10 @@ class Status(IntEnum):
 			"Archived": "Archivé",
 		}
 	}
-table_info = None
-created_this_run = False
 
 print("Ensure custom table exists (Metadata):")
+table_info = None
+created_this_run = False
 
 # Check for existing table using list_tables
 log_call("client.list_tables()")
@@ -169,6 +169,20 @@ def print_line_summaries(label: str, summaries: list[dict]) -> None:
 			f"count={s.get('count')} amount={s.get('amount')} when={s.get('when')}"
 		)
 
+def _resolve_status_value(kind: str, raw_value, use_french: bool):
+	"""kind values:
+	  - 'label': English label
+	  - 'fr_label': French label if allowed, else fallback to English equivalent
+	  - 'int': the enum integer value
+	"""
+	if kind == "label":
+		return raw_value
+	if kind == "fr_label":
+		if use_french:
+			return raw_value
+		return "Active" if raw_value == "Actif" else "Inactive"
+	return raw_value
+
 def _has_installed_language(base_url: str, credential, lcid: int) -> bool:
 	try:
 		token = credential.get_token(f"{base_url}/.default").token
@@ -188,6 +202,7 @@ def _has_installed_language(base_url: str, credential, lcid: int) -> bool:
 	except Exception:
 		return False
 
+# if French language (1036) is installed, we use labels in both English and French
 use_french_labels = _has_installed_language(base_url, credential, 1036)
 if use_french_labels:
 	print({"labels_language": "fr", "note": "French labels in use."})
@@ -205,50 +220,45 @@ single_payload = {
 	amount_key: 123.45,
 	when_key: "2025-01-01",
 	f"{attr_prefix}_active": True,
-	status_key: ("Actif" if use_french_labels else Status.Active.value),  # label or int
+	status_key: ("Actif" if use_french_labels else Status.Active.value),
 }
 # Generate multiple payloads
 # Distribution update: roughly one-third English labels, one-third French labels, one-third raw integer values.
 # We cycle per record: index % 3 == 1 -> English label, == 2 -> French label (if available, else English), == 0 -> integer value.
 multi_payloads: list[dict] = []
-total_multi = 15
 base_date = date(2025, 1, 2)
-# Fixed 6-step cycle pattern: Active, Inactive, Actif, Inactif, 1, 2 (repeat)
-# If French not present, Actif/Inactif positions fallback to Active/Inactive.
-pattern_cycle = [
-    ("label", "Active"),
-    ("label", "Inactive"),
-    ("fr_label", "Actif"),
-    ("fr_label", "Inactif"),
-    ("int", Status.Active.value),
-    ("int", Status.Inactive.value),
-]
-cycle_len = len(pattern_cycle)
-for i in range(1, total_multi + 1):
-    kind, val = pattern_cycle[(i - 1) % cycle_len]
-    if kind == "label":
-        status_field_value = val  # English label
-    elif kind == "fr_label":
-        if use_french_labels:
-            status_field_value = val
-        else:
-            # Fallback to equivalent English (Actif->Active, Inactif->Inactive)
-            status_field_value = "Active" if val == "Actif" else "Inactive"
-    else:  # int
-        status_field_value = val
-    multi_payloads.append(
-        {
-            f"{attr_prefix}_name": f"Sample {i:02d}",
-            code_key: f"X{200 + i:03d}",
-            count_key: 5 * i,
-            amount_key: round(10.0 * i, 2),
-            when_key: (base_date + timedelta(days=i - 1)).isoformat(),
-            f"{attr_prefix}_active": True,
-            status_key: status_field_value,
-        }
-    )
+# Fixed 6-step cycle pattern encapsulated in helper: Active, Inactive, Actif, Inactif, 1, 2 (repeat)
+def _status_value_for_index(idx: int, use_french: bool):
+	pattern = [
+		("label", "Active"),
+		("label", "Inactive"),
+		("fr_label", "Actif"),
+		("fr_label", "Inactif"),
+		("int", Status.Active.value),
+		("int", Status.Inactive.value),
+	]
+	kind, raw = pattern[(idx - 1) % len(pattern)]
+	if kind == "label":
+		return raw
+	if kind == "fr_label":
+		if use_french:
+			return raw
+		return "Active" if raw == "Actif" else "Inactive"
+	return raw
+
+for i in range(1, 16):
+	multi_payloads.append({
+		f"{attr_prefix}_name": f"Sample {i:02d}",
+		code_key: f"X{200 + i:03d}",
+		count_key: 5 * i,
+		amount_key: round(10.0 * i, 2),
+		when_key: (base_date + timedelta(days=i - 1)).isoformat(),
+		f"{attr_prefix}_active": True,
+		status_key: _status_value_for_index(i, use_french_labels),
+	})
 
 record_ids: list[str] = []
+
 try:
 	# Single create returns list[str] (length 1)
 	log_call(f"client.create('{entity_set}', single_payload)")

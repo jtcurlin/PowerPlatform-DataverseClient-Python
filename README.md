@@ -272,7 +272,7 @@ for page in pages:  # page is list[dict]
 ### Custom table (metadata) example
 
 ```python
-# Support multi-lingual enums
+# Support enums with labels in different languages
 class Status(IntEnum):
 	Active = 1
 	Inactive = 2
