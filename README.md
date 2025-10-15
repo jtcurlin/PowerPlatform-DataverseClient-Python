@@ -340,9 +340,6 @@ VS Code Tasks
 
 The SDK uses a lightweight feature flag system.
 
-Current flags:
-- `option_set_label_conversion` – Translate picklist (option set) string labels in outgoing create/update payloads into their numeric values using cached metadata (TTL 1h). Disabled by default.
-
 Source & schema:
 `feature_flags.json` (packaged) provides defaults. Each feature MUST use the strict object form only:
 
@@ -355,22 +352,17 @@ Source & schema:
 }
 ```
 
-Rules:
+Notes:
 - Both `default` (bool) and `description` (non-empty string) are required.
 - No extra keys are allowed (startup fails fast on unknown keys).
 - The JSON file does NOT accept boolean shorthand; that form is permitted only for runtime overrides passed to the client.
 
-Override precedence (highest wins):
-1. Explicit `feature_flags={...}` passed to `DataverseClient` (boolean overrides only at present).
-2. Bundled `feature_flags.json` defaults (boolean or object form).
-
-Provide a feature flag mapping at construction:
+Override a feature flag mapping at construction:
 ```python
 client = DataverseClient(
 	base_url="https://yourorg.crm.dynamics.com",
 	feature_flags={
 		"option_set_label_conversion": True,
-		# future flags here
 	}
 )
 ```
