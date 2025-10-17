@@ -7,6 +7,7 @@ from typing import Optional
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from dataverse_sdk import DataverseClient
+from enum import IntEnum
 from azure.identity import InteractiveBrowserCredential
 import traceback
 import requests
@@ -64,6 +65,24 @@ def backoff_retry(op, *, delays=(0, 2, 5, 10, 20), retry_http_statuses=(400, 403
 	if last_exc:
 		raise last_exc
 
+# Enum demonstrating local option set creation with multilingual labels (for French labels to work, enable French language in the environment first)
+class Status(IntEnum):
+	Active = 1
+	Inactive = 2
+	Archived = 5
+	__labels__ = {
+		1033: {
+			"Active": "Active",
+			"Inactive": "Inactive",
+			"Archived": "Archived",
+		},
+		1036: {
+			"Active": "Actif",
+			"Inactive": "Inactif",
+			"Archived": "Archivé",
+		}
+	}
+
 print("Ensure custom table exists (Metadata):")
 table_info = None
 created_this_run = False
@@ -86,7 +105,7 @@ if existing_table:
 else:
 	# Create it since it doesn't exist
 	try:
-		log_call("client.create_table('new_SampleItem', schema={code,count,amount,when,active})")
+		log_call("client.create_table('new_SampleItem', schema={code,count,amount,when,active,status<enum>})")
 		table_info = client.create_table(
 			"new_SampleItem",
 			{
@@ -95,6 +114,7 @@ else:
 				"amount": "decimal",
 				"when": "datetime",
 				"active": "bool",
+				"status": Status,
 			},
 		)
 		created_this_run = True if table_info and table_info.get("columns_created") else False
@@ -130,6 +150,7 @@ code_key = f"{attr_prefix}_code"
 count_key = f"{attr_prefix}_count"
 amount_key = f"{attr_prefix}_amount"
 when_key = f"{attr_prefix}_when"
+status_key = f"{attr_prefix}_status"
 id_key = f"{logical}id"
 
 def summary_from_record(rec: dict) -> dict:
@@ -148,6 +169,46 @@ def print_line_summaries(label: str, summaries: list[dict]) -> None:
 			f"count={s.get('count')} amount={s.get('amount')} when={s.get('when')}"
 		)
 
+def _resolve_status_value(kind: str, raw_value, use_french: bool):
+	"""kind values:
+	  - 'label': English label
+	  - 'fr_label': French label if allowed, else fallback to English equivalent
+	  - 'int': the enum integer value
+	"""
+	if kind == "label":
+		return raw_value
+	if kind == "fr_label":
+		if use_french:
+			return raw_value
+		return "Active" if raw_value == "Actif" else "Inactive"
+	return raw_value
+
+def _has_installed_language(base_url: str, credential, lcid: int) -> bool:
+	try:
+		token = credential.get_token(f"{base_url}/.default").token
+		url = f"{base_url}/api/data/v9.2/RetrieveAvailableLanguages()"
+		headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+		resp = requests.get(url, headers=headers, timeout=15)
+		if not resp.ok:
+			return False
+		data = resp.json() if resp.content else {}
+		langs: list[int] = []
+		for val in data.values():
+			if isinstance(val, list) and val and all(isinstance(x, int) for x in val):
+				langs = val
+				break
+		print({"lang_check": {"endpoint": url, "status": resp.status_code, "found": langs, "using": lcid in langs}})
+		return lcid in langs
+	except Exception:
+		return False
+
+# if French language (1036) is installed, we use labels in both English and French
+use_french_labels = _has_installed_language(base_url, credential, 1036)
+if use_french_labels:
+	print({"labels_language": "fr", "note": "French labels in use."})
+else:
+	print({"labels_language": "en", "note": "Using English (and numeric values)."})
+
 # 2) Create a record in the new table
 print("Create records (OData) demonstrating single create and bound CreateMultiple (multi):")
 
@@ -159,21 +220,42 @@ single_payload = {
 	amount_key: 123.45,
 	when_key: "2025-01-01",
 	f"{attr_prefix}_active": True,
+	status_key: ("Actif" if use_french_labels else Status.Active.value),
 }
 # Generate multiple payloads
+# Distribution update: roughly one-third English labels, one-third French labels, one-third raw integer values.
+# We cycle per record: index % 3 == 1 -> English label, == 2 -> French label (if available, else English), == 0 -> integer value.
 multi_payloads: list[dict] = []
 base_date = date(2025, 1, 2)
+# Fixed 6-step cycle pattern encapsulated in helper: Active, Inactive, Actif, Inactif, 1, 2 (repeat)
+def _status_value_for_index(idx: int, use_french: bool):
+	pattern = [
+		("label", "Active"),
+		("label", "Inactive"),
+		("fr_label", "Actif"),
+		("fr_label", "Inactif"),
+		("int", Status.Active.value),
+		("int", Status.Inactive.value),
+	]
+	kind, raw = pattern[(idx - 1) % len(pattern)]
+	if kind == "label":
+		return raw
+	if kind == "fr_label":
+		if use_french:
+			return raw
+		return "Active" if raw == "Actif" else "Inactive"
+	return raw
+
 for i in range(1, 16):
-	multi_payloads.append(
-		{
-			f"{attr_prefix}_name": f"Sample {i:02d}",
-			code_key: f"X{200 + i:03d}",
-			count_key: 5 * i,
-			amount_key: round(10.0 * i, 2),
-			when_key: (base_date + timedelta(days=i - 1)).isoformat(),
-			f"{attr_prefix}_active": True,
-		}
-	)
+	multi_payloads.append({
+		f"{attr_prefix}_name": f"Sample {i:02d}",
+		code_key: f"X{200 + i:03d}",
+		count_key: 5 * i,
+		amount_key: round(10.0 * i, 2),
+		when_key: (base_date + timedelta(days=i - 1)).isoformat(),
+		f"{attr_prefix}_active": True,
+		status_key: _status_value_for_index(i, use_french_labels),
+	})
 
 record_ids: list[str] = []
 
@@ -239,11 +321,13 @@ try:
 		f"{attr_prefix}_amount": 543.21,
 		f"{attr_prefix}_when": "2025-02-02",
 		f"{attr_prefix}_active": False,
+		status_key: ("Inactif" if use_french_labels else Status.Inactive.value),
 	}
 	expected_checks = {
 		f"{attr_prefix}_code": "X002",
 		f"{attr_prefix}_count": 99,
 		f"{attr_prefix}_active": False,
+		status_key: Status.Inactive.value,
 	}
 	amount_key = f"{attr_prefix}_amount"
 
@@ -356,7 +440,7 @@ def run_paging_demo(label: str, *, top: Optional[int], page_size: Optional[int])
 	print({"paging_demo": label, "top": top, "page_size": page_size})
 	total = 0
 	page_index = 0
-	_select = [id_key, code_key, amount_key, when_key]
+	_select = [id_key, code_key, amount_key, when_key, status_key]
 	_orderby = [f"{code_key} asc"]
 	for page in client.get_multiple(
 		entity_set,
@@ -373,7 +457,13 @@ def run_paging_demo(label: str, *, top: Optional[int], page_size: Optional[int])
 			"page": page_index,
 			"page_size": len(page),
 			"sample": [
-				{"id": r.get(id_key), "code": r.get(code_key), "amount": r.get(amount_key), "when": r.get(when_key)}
+				{
+					"id": r.get(id_key),
+					"code": r.get(code_key),
+					"amount": r.get(amount_key),
+					"when": r.get(when_key),
+					"status": r.get(status_key),
+				}
 				for r in page[:5]
 			],
 		})

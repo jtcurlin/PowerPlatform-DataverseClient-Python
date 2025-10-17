@@ -59,7 +59,11 @@ class DataverseClient:
             The lazily-initialized low-level client used to perform requests.
         """
         if self._odata is None:
-            self._odata = ODataClient(self.auth, self._base_url, self._config)
+            self._odata = ODataClient(
+                self.auth,
+                self._base_url,
+                self._config,
+            )
         return self._odata
 
     # ---------------- Unified CRUD: create/update/delete ----------------
@@ -206,16 +210,19 @@ class DataverseClient:
         """
         return self._get_odata()._get_table_info(tablename)
 
-    def create_table(self, tablename: str, schema: Dict[str, str]) -> Dict[str, Any]:
+    def create_table(self, tablename: str, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Create a simple custom table.
 
         Parameters
         ----------
         tablename : str
             Friendly name (``"SampleItem"``) or a full schema name (``"new_SampleItem"``).
-        schema : dict[str, str]
+        schema : dict[str, Any]
             Column definitions mapping logical names (without prefix) to types.
-            Supported: ``string``, ``int``, ``decimal``, ``float``, ``datetime``, ``bool``.
+            Supported:
+              - Primitive types: ``string``, ``int``, ``decimal``, ``float``, ``datetime``, ``bool``
+              - Enum subclass (IntEnum preferred): generates a local option set.
+                Optional multilingual labels via ``__labels__ = {1033: {"Active": "Active"}, 1036: {"Active": "Actif"}}``
 
         Returns
         -------
@@ -297,6 +304,27 @@ class DataverseClient:
             if_none_match=if_none_match,
         )
         return None
+
+    # Cache utilities
+    def flush_cache(self, kind) -> int:
+        """Flush cached client metadata/state.
+
+        Currently supported kinds:
+          - 'picklist': clears entries from the picklist label cache used by label -> int conversion.
+
+        Parameters
+        ----------
+        kind : str
+            Cache kind to flush. Only 'picklist' is implemented today. Future kinds
+            (e.g. 'entityset', 'primaryid') can be added without breaking the signature.
+
+        Returns
+        -------
+        int
+            Number of cache entries removed.
+
+        """
+        return self._get_odata()._flush_cache(kind)
 
 __all__ = ["DataverseClient"]
 

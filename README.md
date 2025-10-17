@@ -16,7 +16,7 @@ A Python package allowing developers to connect to Dataverse environments for DD
 
 - Simple `DataverseClient` facade for CRUD, SQL (read-only), and table metadata.
 - SQL-over-API: Constrained SQL (single SELECT with limited WHERE/TOP/ORDER BY) via native Web API `?sql=` parameter.
-- Table metadata ops: create simple custom tables with primitive columns (string/int/decimal/float/datetime/bool) and delete them.
+- Table metadata ops: create simple custom tables (supports string/int/decimal/float/datetime/bool/optionset) and delete them.
 - Bulk create via `CreateMultiple` (collection-bound) by passing `list[dict]` to `create(entity_set, payloads)`; returns list of created IDs.
 - Bulk update via `UpdateMultiple` (invoked internally) by calling unified `update(entity_set, ids, patch|patches)`; returns nothing.
 - Retrieve multiple with server-driven paging: `get_multiple(...)` yields lists (pages) following `@odata.nextLink`. Control total via `$top` and per-page via `page_size` (Prefer: `odata.maxpagesize`).
@@ -289,7 +289,25 @@ for page in pages:  # page is list[dict]
 ### Custom table (metadata) example
 
 ```python
-# Create a simple custom table and a few primitive columns
+# Support enums with labels in different languages
+class Status(IntEnum):
+	Active = 1
+	Inactive = 2
+	Archived = 5
+	__labels__ = {
+		1033: {
+			"Active": "Active",
+			"Inactive": "Inactive",
+			"Archived": "Archived",
+		},
+		1036: {
+			"Active": "Actif",
+			"Inactive": "Inactif",
+			"Archived": "Archivé",
+		}
+	}
+
+# Create a simple custom table and a few columns
 info = client.create_table(
 	"SampleItem",  # friendly name; defaults to SchemaName new_SampleItem
 	{
@@ -298,6 +316,7 @@ info = client.create_table(
 		"amount": "decimal",
 		"when": "datetime",
 		"active": "bool",
+		"status": Status,
 	},
 )
 
