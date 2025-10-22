@@ -118,42 +118,8 @@ class ODataClient(ODataFileUpload):
             is_transient=is_transient,
         )
 
-    # ----------------------------- CRUD ---------------------------------
-    def _create(self, logical_name: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[str, List[str]]:
-        """Create one or many records by logical (singular) name.
-
-        Parameters
-        ----------
-        logical_name : str
-            Logical (singular) entity name, e.g. "account".
-        data : dict | list[dict]
-            Single entity payload or list of payloads for batch create.
-
-        Behaviour
-        ---------
-        - Resolves entity set once per call via metadata (cached) then issues requests.
-        - Single (dict): POST /{entity_set}. Returns GUID string (no representation fetched).
-        - Multiple (list[dict]): POST /{entity_set}/Microsoft.Dynamics.CRM.CreateMultiple. Returns list[str] of created GUIDs.
-
-        Multi-create logical name resolution
-        ------------------------------------
-        - If any payload omits ``@odata.type`` the client stamps ``Microsoft.Dynamics.CRM.<logical_name>``.
-        - If all payloads already include ``@odata.type`` no modification occurs.
-
-        Returns
-        -------
-        str | list[str]
-            Created record GUID (single) or list of created IDs (multi).
-        """
-        entity_set = self._entity_set_from_logical(logical_name)
-        if isinstance(data, dict):
-            return self._create_single(entity_set, logical_name, data)
-        if isinstance(data, list):
-            return self._create_multiple(entity_set, logical_name, data)
-        raise TypeError("data must be dict or list[dict]")
-
-    # --- Internal helpers ---
-    def _create_single(self, entity_set: str, logical_name: str, record: Dict[str, Any]) -> str:
+    # --- CRUD Internal functions ---
+    def _create(self, entity_set: str, logical_name: str, record: Dict[str, Any]) -> str:
         """Create a single record and return its GUID.
 
         Relies on OData-EntityId (canonical) or Location header. No response body parsing is performed.
