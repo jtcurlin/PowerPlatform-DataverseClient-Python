@@ -122,6 +122,22 @@ class ODataClient(ODataFileUpload):
     def _create(self, entity_set: str, logical_name: str, record: Dict[str, Any]) -> str:
         """Create a single record and return its GUID.
 
+        Parameters
+        -------
+        entity_set : str
+            Resolved entity set (plural) name.
+        logical_name : str
+            Singular logical entity name.
+        record : dict[str, Any]
+            Attribute payload mapped by logical column names.
+
+        Returns
+        -------
+        str
+            Created record GUID.
+
+        Notes
+        -------
         Relies on OData-EntityId (canonical) or Location header. No response body parsing is performed.
         Raises RuntimeError if neither header contains a GUID.
         """
@@ -145,6 +161,27 @@ class ODataClient(ODataFileUpload):
         )
 
     def _create_multiple(self, entity_set: str, logical_name: str, records: List[Dict[str, Any]]) -> List[str]:
+        """Create multiple records using the collection-bound CreateMultiple action.
+
+        Parameters
+        ----------
+        entity_set : str
+            Resolved entity set (plural) name.
+        logical_name : str
+            Singular logical entity name.
+        records : list[dict[str, Any]]
+            Payloads mapped by logical attribute names.
+
+        Multi-create logical name resolution
+        ------------------------------------
+        - If any payload omits ``@odata.type`` the client stamps ``Microsoft.Dynamics.CRM.<logical_name>``.
+        - If all payloads already include ``@odata.type`` no modification occurs.
+        
+        Returns
+        -------
+        list[str]
+            List of created IDs.
+        """
         if not all(isinstance(r, dict) for r in records):
             raise TypeError("All items for multi-create must be dicts")
         need_logical = any("@odata.type" not in r for r in records)
