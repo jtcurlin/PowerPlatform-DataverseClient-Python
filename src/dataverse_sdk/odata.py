@@ -680,7 +680,6 @@ class ODataClient(ODataFileUpload):
         self,
         entity_metadata_id: str,
         schema_name: str,
-        *,
         extra_select: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         attr_escaped = self._escape_odata_quotes(schema_name)
