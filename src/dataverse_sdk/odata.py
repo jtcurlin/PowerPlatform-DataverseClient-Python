@@ -655,7 +655,7 @@ class ODataClient(ODataFileUpload):
         params = None
         if solution_unique_name:
             params = {"SolutionUniqueName": solution_unique_name}
-        r = self._request("post", url, json=payload, params=params)
+        self._request("post", url, json=payload, params=params)
         ent = self._wait_for_entity_ready(schema_name)
         if not ent or not ent.get("EntitySetName"):
             raise RuntimeError(
