@@ -201,7 +201,14 @@ class DataverseClient:
         od._update_by_ids(logical_name, ids, changes)
         return None
 
-    def delete(self, logical_name: str, ids: Union[str, List[str]]) -> None:
+    def delete(
+        self,
+        logical_name: str,
+        ids: Union[str, List[str]],
+        wait: bool = False,
+        wait_timeout_seconds: Optional[int] = 300,
+        wait_poll_interval_seconds: float = 2.0,
+    ) -> Optional[str]:
         """
         Delete one or more records by GUID.
 
@@ -209,8 +216,17 @@ class DataverseClient:
         :type logical_name: str
         :param ids: Single GUID string or list of GUID strings to delete.
         :type ids: str or list[str]
-
+        :param wait: When deleting multiple records, wait for the background job to complete. Ignored for single deletes.
+        :type wait: bool
+        :param wait_timeout_seconds: Optional timeout applied when ``wait`` is True. ``None`` or
+            values ``<= 0`` wait indefinitely. Defaults to 300 seconds.
+        :type wait_timeout_seconds: int or None
+        :param wait_poll_interval_seconds: Poll interval used while waiting for job completion.
+        :type wait_poll_interval_seconds: float
         :raises TypeError: If ``ids`` is not str or list[str].
+        
+        :return: BulkDelete job ID when deleting multiple records; otherwise ``None``.
+        :rtype: str or None
 
         Example:
             Delete a single record::
@@ -219,7 +235,7 @@ class DataverseClient:
 
             Delete multiple records::
 
-                client.delete("account", [id1, id2, id3])
+                job_id = client.delete("account", [id1, id2, id3])
         """
         od = self._get_odata()
         if isinstance(ids, str):
@@ -227,8 +243,13 @@ class DataverseClient:
             return None
         if not isinstance(ids, list):
             raise TypeError("ids must be str or list[str]")
-        od._delete_multiple(logical_name, ids)
-        return None
+        return od._delete_multiple(
+            logical_name,
+            ids,
+            wait=wait,
+            timeout_seconds=wait_timeout_seconds,
+            poll_interval_seconds=wait_poll_interval_seconds,
+        )
 
     def get(
         self,
