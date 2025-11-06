@@ -24,7 +24,7 @@ A Python package allowing developers to connect to Dataverse environments for DD
 - Optional pandas integration (`PandasODataClient`) for DataFrame based create / get / query.
 
 Auth:
-- Accept only an `azure.core.credentials.TokenCredential` credential.
+- Accept only an `azure.core.credentials.TokenCredential` credential. See full supported list at https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential?view=azure-dotnet.
 - Token scope used by the SDK: `https://<yourorg>.crm.dynamics.com/.default` (derived from `base_url`).
 
 ## API Reference (Summary)
