@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List, Union, Iterable, Tuple
+from typing import Any, Dict, Optional, List, Union, Iterable
 from enum import Enum
 import unicodedata
 import time
@@ -286,14 +286,10 @@ class ODataClient(ODataFileUpload):
         self,
         logical_name: str,
         ids: List[str],
-        wait: bool = False,
-        timeout_seconds: Optional[int] = 300,
-        poll_interval_seconds: float = 2.0,
     ) -> Optional[str]:
         """Delete many records by GUID list.
 
-        Returns the asynchronous job identifier. When ``wait`` is True the call blocks until the
-        async operation completes or the timeout elapses.
+        Returns the asynchronous job identifier reported by the BulkDelete action.
         """
         if not isinstance(ids, list):
             raise TypeError("ids must be list[str]")
@@ -307,8 +303,6 @@ class ODataClient(ODataFileUpload):
         pk_attr = self._primary_id_attr(logical_name)
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         job_label = f"Bulk delete {logical_name} records @ {timestamp}"
-
-        when_utc = timestamp
 
         query = {
             "@odata.type": "Microsoft.Dynamics.CRM.QueryExpression",
@@ -338,7 +332,7 @@ class ODataClient(ODataFileUpload):
             "ToRecipients": [],
             "CCRecipients": [],
             "RecurrencePattern": "",
-            "StartDateTime": when_utc,
+            "StartDateTime": timestamp,
             "QuerySet": [query],
         }
 
@@ -353,115 +347,7 @@ class ODataClient(ODataFileUpload):
         if isinstance(body, dict):
             job_id = body.get("JobId")
 
-        if wait and job_id:
-            payload, succeeded = self._wait_for_async_job(
-                job_id,
-                timeout_seconds=timeout_seconds,
-                poll_interval=poll_interval_seconds,
-            )
-            if not succeeded:
-                state = payload.get("statecode")
-                status = payload.get("statuscode")
-                message = payload.get("message")
-                raise RuntimeError(
-                    f"Bulk delete async job '{job_id}' did not succeed (state={state}, status={status})."
-                    + (f" Message: {message}" if message else "")
-                )
-
         return job_id
-
-    def _wait_for_async_job(
-        self,
-        job_id: str,
-        timeout_seconds: Optional[int] = 300,
-        poll_interval: float = 2.0,
-    ) -> Tuple[Dict[str, Any], bool]:
-        """Poll the asyncoperation record until completion or timeout.
-
-        Returns the last payload and a boolean indicating success.
-        """
-        if not job_id:
-            return {}, False
-
-        interval = poll_interval if poll_interval and poll_interval > 0 else 2.0
-        deadline = None
-        if timeout_seconds is not None and timeout_seconds > 0:
-            deadline = time.time() + timeout_seconds
-
-        url = f"{self.api}/asyncoperations({job_id})"
-        params = {"$select": "statecode,statuscode,name,message"}
-        last_payload: Dict[str, Any] = {}
-
-        while True:
-            now = time.time()
-            if deadline and now >= deadline:
-                message = last_payload.get("message") if last_payload else None
-                raise TimeoutError(
-                    f"Timed out waiting for async job '{job_id}' to complete."
-                    + (f" Last message: {message}" if message else "")
-                )
-
-            try:
-                response = self._request("get", url, params=params)
-                try:
-                    payload = response.json() if response.text else {}
-                except ValueError:
-                    payload = {}
-                if isinstance(payload, dict):
-                    last_payload = payload
-                else:
-                    last_payload = {}
-            except HttpError as err:
-                if getattr(err, "status_code", None) == 404:
-                    # The job record might not be immediately available yet; retry until timeout.
-                    time.sleep(interval)
-                    continue
-                raise
-
-            state = last_payload.get("statecode")
-            status = last_payload.get("statuscode")
-            finished, succeeded = self._interpret_async_job_state(state, status)
-            if finished:
-                return last_payload, succeeded
-
-            time.sleep(interval)
-
-    @staticmethod
-    def _interpret_async_job_state(state_raw: Any, status_raw: Any) -> Tuple[bool, bool]:
-        """Return (finished, succeeded) flags for an asyncoperation state/status."""
-
-        def _norm(val: Any) -> str:
-            if val is None:
-                return ""
-            if isinstance(val, str):
-                return val.strip().lower()
-            return str(val).strip().lower()
-
-        state_norm = _norm(state_raw)
-        status_norm = _norm(status_raw)
-
-        finished = False
-        succeeded = False
-
-        if state_norm in {"3", "completed", "complete", "succeeded"}:
-            finished = True
-
-        if status_norm in {"30", "succeeded", "success", "completed"}:
-            finished = True
-            succeeded = True
-        elif status_norm in {"31", "failed", "failure"}:
-            finished = True
-            succeeded = False
-        elif status_norm in {"32", "33", "canceled", "cancelled"}:
-            finished = True
-            succeeded = False
-        elif status_norm.isdigit():
-            code = int(status_norm)
-            if code >= 30:
-                finished = True
-                succeeded = (code == 30)
-
-        return finished, succeeded
 
     def _format_key(self, key: str) -> str:
         k = key.strip()

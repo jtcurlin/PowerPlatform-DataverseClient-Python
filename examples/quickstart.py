@@ -494,10 +494,6 @@ try:
 		single_error: Optional[str] = None
 		bulk_job_id: Optional[str] = None
 		bulk_error: Optional[str] = None
-		bulk_wait_job_id: Optional[str] = None
-		bulk_wait_error: Optional[str] = None
-		async_targets: list[str] = []
-		wait_targets: list[str] = []
 
 		try:
 			log_call(f"client.delete('{logical}', '{single_target}')")
@@ -505,25 +501,26 @@ try:
 		except Exception as ex:
 			single_error = str(ex)
 
-		if rest_targets:
-			half = len(rest_targets) // 2
-			async_targets = rest_targets[:half]
-			wait_targets = rest_targets[half:]
+		half = max(1, len(rest_targets) // 2)
+		bulk_targets = rest_targets[:half]
+		sequential_targets = rest_targets[half:]
+		bulk_error = None
+		sequential_error = None
 
-			try:
-				log_call(f"client.delete('{logical}', <{len(async_targets)} ids>) [fire-and-forget]")
-				bulk_job_id = client.delete(logical, async_targets)
-			except Exception as ex:
-				bulk_error = str(ex)
-			try:
-				log_call(f"client.delete('{logical}', <{len(wait_targets)} ids>, wait=True)")
-				bulk_wait_job_id = client.delete(
-					logical,
-					wait_targets,
-					wait=True,
-				)
-			except Exception as ex:
-				bulk_wait_error = str(ex)
+		# Fire-and-forget bulk delete for the first portion
+		try:
+			log_call(f"client.delete('{logical}', <{len(bulk_targets)} ids>, use_bulk_delete=True)")
+			bulk_job_id = client.delete(logical, bulk_targets)
+		except Exception as ex:
+			bulk_error = str(ex)
+
+		# Sequential deletes for the remainder
+		try:
+			log_call(f"client.delete('{logical}', <{len(sequential_targets)} ids>, use_bulk_delete=False)")
+			for rid in sequential_targets:
+				backoff_retry(lambda rid=rid: client.delete(logical, rid, use_bulk_delete=False))
+		except Exception as ex:
+			sequential_error = str(ex)
 
 		print({
 			"entity": logical,
@@ -531,15 +528,14 @@ try:
 				"id": single_target,
 				"error": single_error,
 			},
-			"delete_bulk_fire_and_forget": {
-				"count": len(async_targets) if rest_targets else 0,
+			"delete_bulk": {
+				"count": len(bulk_targets),
 				"job_id": bulk_job_id,
 				"error": bulk_error,
 			},
-			"delete_bulk_wait": {
-				"count": len(wait_targets) if rest_targets else 0,
-				"job_id": bulk_wait_job_id,
-				"error": bulk_wait_error,
+			"delete_sequential": {
+				"count": len(sequential_targets),
+				"error": sequential_error,
 			},
 		})
 	else:

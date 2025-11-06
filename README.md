@@ -39,7 +39,7 @@ Auth:
 | `update` | `update(logical_name, list[id], patch)` | `None` | Broadcast; same patch applied to all IDs (UpdateMultiple). |
 | `update` | `update(logical_name, list[id], list[patch])` | `None` | 1:1 patches; lengths must match (UpdateMultiple). |
 | `delete` | `delete(logical_name, id)` | `None` | Delete one record. |
-| `delete` | `delete(logical_name, list[id], ..., wait_poll_interval_seconds=2.0)` | `Optional[str]` | Delete many with async BulkDelete. |
+| `delete` | `delete(logical_name, list[id], use_bulk_delete=True)` | `Optional[str]` | Delete many with async BulkDelete or sequential single-record delete. |
 | `query_sql` | `query_sql(sql)` | `list[dict]` | Constrained read-only SELECT via `?sql=`. |
 | `create_table` | `create_table(tablename, schema, solution_unique_name=None)` | `dict` | Creates custom table + columns. Friendly name (e.g. `SampleItem`) becomes schema `new_SampleItem`; explicit schema name (contains `_`) used as-is. Pass `solution_unique_name` to attach the table to a specific solution instead of the default solution. |
 | `create_column` | `create_column(tablename, columns)` | `list[str]` | Adds columns using a `{name: type}` mapping (same shape as `create_table` schema). Returns schema names for the created columns. |
@@ -56,8 +56,8 @@ Guidelines:
 - `create` always returns a list of GUIDs (1 for single, N for bulk).
 - `update` always returns `None`.
 - Bulk update chooses broadcast vs per-record by the type of `changes` (dict vs list).
-- `delete` returns `None` for single-record delete and the BulkDelete async job ID for multi-record delete.
-- By default multi-record delete doesn't wait for the async job to complete. User can optionally wait for the job to complete.,klmmm 
+- `delete` returns `None` for single-record delete and sequential multi-record delete, and the BulkDelete async job ID for multi-record BulkDelete.
+- BulkDelete doesn't wait for the delete job to complete. It returns once the async delete job is scheduled.
 - Paging and SQL operations never mutate inputs.
 - Metadata lookups for logical name stamping cached per entity set (in-memory).
 
@@ -339,7 +339,8 @@ client.delete_table("SampleItem")       # delete table (friendly name or explici
 
 Notes:
 - `create` always returns a list of GUIDs (length 1 for single input).
-- `update` returns `None`. `delete` returns `None` for single-record delete and the BulkDelete async job ID for multi-record delete.
+- `update` returns `None`.
+- `delete` returns `None` for single-record delete/sequential multi-record delete, and the BulkDelete async job ID for BulkDelete.
 - Passing a list of payloads to `create` triggers bulk create and returns `list[str]` of IDs.
 - `get` supports single record retrieval with record id or paging through result sets (prefer `select` to limit columns).
 - For CRUD methods that take a record id, pass the GUID string (36-char hyphenated). Parentheses around the GUID are accepted but not required.

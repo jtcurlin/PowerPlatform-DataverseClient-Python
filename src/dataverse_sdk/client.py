@@ -205,9 +205,7 @@ class DataverseClient:
         self,
         logical_name: str,
         ids: Union[str, List[str]],
-        wait: bool = False,
-        wait_timeout_seconds: Optional[int] = 300,
-        wait_poll_interval_seconds: float = 2.0,
+        use_bulk_delete: bool = True,
     ) -> Optional[str]:
         """
         Delete one or more records by GUID.
@@ -216,16 +214,14 @@ class DataverseClient:
         :type logical_name: str
         :param ids: Single GUID string or list of GUID strings to delete.
         :type ids: str or list[str]
-        :param wait: When deleting multiple records, wait for the background job to complete. Ignored for single deletes.
-        :type wait: bool
-        :param wait_timeout_seconds: Optional timeout applied when ``wait`` is True. ``None`` or
-            values ``<= 0`` wait indefinitely. Defaults to 300 seconds.
-        :type wait_timeout_seconds: int or None
-        :param wait_poll_interval_seconds: Poll interval used while waiting for job completion.
-        :type wait_poll_interval_seconds: float
+        :param use_bulk_delete: When ``True`` (default) and ``ids`` is a list, execute the BulkDelete action and
+            return its async job identifier. When ``False`` each record is deleted sequentially.
+        :type use_bulk_delete: bool
+
         :raises TypeError: If ``ids`` is not str or list[str].
+        :raises HttpError: If the underlying Web API delete request fails.
         
-        :return: BulkDelete job ID when deleting multiple records; otherwise ``None``.
+        :return: BulkDelete job ID when deleting multiple records via BulkDelete; otherwise ``None``.
         :rtype: str or None
 
         Example:
@@ -243,13 +239,15 @@ class DataverseClient:
             return None
         if not isinstance(ids, list):
             raise TypeError("ids must be str or list[str]")
-        return od._delete_multiple(
-            logical_name,
-            ids,
-            wait=wait,
-            timeout_seconds=wait_timeout_seconds,
-            poll_interval_seconds=wait_poll_interval_seconds,
-        )
+        if not ids:
+            return None
+        if not all(isinstance(rid, str) for rid in ids):
+            raise TypeError("ids must contain string GUIDs")
+        if use_bulk_delete:
+            return od._delete_multiple(logical_name, ids)
+        for rid in ids:
+            od._delete(logical_name, rid)
+        return None
 
     def get(
         self,
