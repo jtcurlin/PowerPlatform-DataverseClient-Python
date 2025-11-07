@@ -15,22 +15,6 @@ Get started quickly with fundamental Dataverse operations:
 Explore powerful features for complex scenarios:
 - **`file_upload.py`** - File upload to Dataverse file columns with chunking
 - **`pandas_integration.py`** - DataFrame-based operations for data analysis
-- **`bulk_operations.py`** - Batch processing and bulk data operations
-- **`metadata_management.py`** - Creating and managing custom tables
-- **`sql_queries.py`** - Advanced SQL queries via Web API
-
-### 🔗 Integrations (`integrations/`)
-Connect Dataverse with other Microsoft services:
-- **`power_automate.py`** - Integration patterns with Power Automate
-- **`azure_functions.py`** - Using the SDK in Azure Functions
-- Power BI integration examples
-- Azure Logic Apps patterns
-
-### 🛠️ Utilities (`utilities/`)
-Helper scripts and development tools:
-- **`connection_tester.py`** - Test and validate Dataverse connections
-- **`data_migration.py`** - Scripts for data migration scenarios
-- Development and debugging utilities
 
 ## 🚀 Getting Started
 
