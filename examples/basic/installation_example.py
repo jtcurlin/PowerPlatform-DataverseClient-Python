@@ -33,7 +33,6 @@ Prerequisites:
 
 # Standard imports
 import sys
-from typing import Optional
 
 try:
     # Import the PowerPlatform Dataverse Client SDK
