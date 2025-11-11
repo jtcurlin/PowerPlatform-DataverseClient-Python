@@ -2,9 +2,13 @@
 # Licensed under the MIT license.
 
 """
-PowerPlatform Dataverse Client - Installation and Basic Usage Example
+PowerPlatform Dataverse Client - Installation, Validation & Usage Example
 
-This example shows how to get started with the PowerPlatform-Dataverse-Client SDK.
+This comprehensive example demonstrates:
+- Package installation and validation
+- Import verification and troubleshooting  
+- Basic usage patterns and code examples
+- Optional interactive testing with real Dataverse environment
 
 ## Installation
 
@@ -18,103 +22,309 @@ This example shows how to get started with the PowerPlatform-Dataverse-Client SD
    pip install azure-identity
    ```
 
-## Basic Usage
+## What This Script Does
 
-This example demonstrates:
-- Installing the required packages
-- Setting up authentication
-- Creating a client instance
-- Performing basic operations
+- ✅ Validates package installation and imports
+- ✅ Checks version and package metadata
+- ✅ Shows code examples and usage patterns
+- ✅ Offers optional interactive testing
+- ✅ Provides troubleshooting guidance
 
-Prerequisites:
+Prerequisites for Interactive Testing:
 - Access to a Microsoft Dataverse environment
 - Azure Identity credentials configured
+- Interactive browser access for authentication
 """
 
 # Standard imports
 import sys
+import subprocess
 from typing import Optional
+from datetime import datetime
 
-try:
-    # Import the PowerPlatform Dataverse Client SDK
-    from PowerPlatform.Dataverse import DataverseClient
-    from azure.identity import DefaultAzureCredential, InteractiveBrowserCredential
+def validate_imports():
+    """Validate that all key imports work correctly."""
+    print("🔍 Validating Package Imports...")
+    print("-" * 50)
     
-    print("✅ PowerPlatform-Dataverse-Client SDK imported successfully!")
-    print(f"📦 You can install this SDK with: pip install PowerPlatform-Dataverse-Client")
-    
-except ImportError as e:
-    print("❌ Failed to import PowerPlatform-Dataverse-Client SDK")
-    print("💡 Install with: pip install PowerPlatform-Dataverse-Client")
-    print(f"Error details: {e}")
-    sys.exit(1)
+    try:
+        # Test main namespace import
+        from PowerPlatform.Dataverse import DataverseClient, __version__
+        print(f"  ✅ Main namespace: PowerPlatform.Dataverse")
+        print(f"  ✅ Package version: {__version__}")
+        print(f"  ✅ DataverseClient class: {DataverseClient}")
+        
+        # Test submodule imports
+        from PowerPlatform.Dataverse.core.errors import HttpError, MetadataError
+        print(f"  ✅ Core errors: HttpError, MetadataError")
+        
+        from PowerPlatform.Dataverse.core.config import DataverseConfig
+        print(f"  ✅ Core config: DataverseConfig")
+        
+        from PowerPlatform.Dataverse.utils.pandas_adapter import PandasODataClient
+        print(f"  ✅ Utils: PandasODataClient")
+        
+        from PowerPlatform.Dataverse.data.odata import ODataClient
+        print(f"  ✅ Data layer: ODataClient")
+        
+        # Test Azure Identity import
+        from azure.identity import InteractiveBrowserCredential
+        print(f"  ✅ Azure Identity: InteractiveBrowserCredential")
+        
+        return True, __version__, DataverseClient
+        
+    except ImportError as e:
+        print(f"  ❌ Import failed: {e}")
+        print("\n💡 Troubleshooting:")
+        print("  • Install with: pip install PowerPlatform-Dataverse-Client")
+        print("  • Install Azure Identity: pip install azure-identity")
+        print("  • Check virtual environment is activated")
+        return False, None, None
 
 
-def main():
-    """Demonstrate basic SDK usage after installation."""
+def validate_client_methods(DataverseClient):
+    """Validate that DataverseClient has expected methods."""
+    print("\n🏗️  Validating Client Methods...")
+    print("-" * 50)
     
-    # Get Dataverse org URL from user
-    org_url = input("Enter your Dataverse org URL (or press Enter to skip): ").strip()
+    expected_methods = [
+        'create', 'get', 'update', 'delete', 
+        'create_table', 'get_table_info', 'delete_table',
+        'list_tables', 'query_sql'
+    ]
     
+    missing_methods = []
+    for method in expected_methods:
+        if hasattr(DataverseClient, method):
+            print(f"  ✅ Method exists: {method}")
+        else:
+            print(f"  ❌ Method missing: {method}")
+            missing_methods.append(method)
+    
+    return len(missing_methods) == 0
+
+
+def validate_package_metadata():
+    """Validate package metadata from pip."""
+    print("\n📦 Validating Package Metadata...")
+    print("-" * 50)
+    
+    try:
+        result = subprocess.run([sys.executable, '-m', 'pip', 'show', 'PowerPlatform-Dataverse-Client'], 
+                              capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            lines = result.stdout.split('\n')
+            for line in lines:
+                if any(line.startswith(prefix) for prefix in ['Name:', 'Version:', 'Summary:', 'Location:']):
+                    print(f"  ✅ {line}")
+            return True
+        else:
+            print(f"  ❌ Package not found in pip list")
+            print("  💡 Try: pip install PowerPlatform-Dataverse-Client")
+            return False
+            
+    except Exception as e:
+        print(f"  ❌ Metadata validation failed: {e}")
+        return False
+
+
+def show_usage_examples():
+    """Display comprehensive usage examples."""
+    print("\n📚 Usage Examples")
+    print("=" * 50)
+    
+    print("""
+🔧 Basic Setup:
+```python
+from PowerPlatform.Dataverse import DataverseClient
+from azure.identity import InteractiveBrowserCredential
+
+# Set up authentication
+credential = InteractiveBrowserCredential()
+
+# Create client
+client = DataverseClient(
+    "https://yourorg.crm.dynamics.com",
+    credential
+)
+```
+
+📝 CRUD Operations:
+```python
+# Create a record
+account_data = {"name": "Contoso Ltd", "telephone1": "555-0100"}
+account_ids = client.create("account", account_data)
+print(f"Created account: {account_ids[0]}")
+
+# Read a record
+account = client.get("account", account_ids[0])
+print(f"Account name: {account['name']}")
+
+# Update a record
+client.update("account", account_ids[0], {"telephone1": "555-0200"})
+
+# Delete a record
+client.delete("account", account_ids[0])
+```
+
+🔍 Querying Data:
+```python
+# Query with OData filter
+accounts = client.get("account", 
+                     filter="name eq 'Contoso Ltd'",
+                     select=["name", "telephone1"],
+                     top=10)
+
+for batch in accounts:
+    for account in batch:
+        print(f"Account: {account['name']}")
+
+# SQL queries (if enabled)
+results = client.query_sql("SELECT TOP 5 name FROM account")
+for row in results:
+    print(row['name'])
+```
+
+🏗️ Table Management:
+```python
+# Create custom table
+table_info = client.create_table("CustomEntity", {
+    "name": "string",
+    "description": "string", 
+    "amount": "decimal",
+    "is_active": "bool"
+})
+
+# Get table information
+info = client.get_table_info("CustomEntity")
+print(f"Table: {info['entity_schema']}")
+
+# List all tables
+tables = client.list_tables()
+print(f"Found {len(tables)} tables")
+```
+""")
+
+
+def interactive_test():
+    """Offer optional interactive testing with real Dataverse environment."""
+    print("\n🧪 Interactive Testing")
+    print("=" * 50)
+    
+    choice = input("Would you like to test with a real Dataverse environment? (y/N): ").strip().lower()
+    
+    if choice not in ['y', 'yes']:
+        print("  ℹ️  Skipping interactive test")
+        return
+    
+    print("\n🌐 Dataverse Environment Setup")
+    print("-" * 50)
+    
+    if not sys.stdin.isatty():
+        print("  ❌ Interactive input required for testing")
+        return
+    
+    org_url = input("Enter your Dataverse org URL (e.g., https://yourorg.crm.dynamics.com): ").strip()
     if not org_url:
-        print("\n🎯 Example Usage After Installation:")
-        print("```python")
-        print("from PowerPlatform.Dataverse import DataverseClient")
-        print("from azure.identity import DefaultAzureCredential")
-        print("")
-        print("# Set up authentication")
-        print("credential = DefaultAzureCredential()")
-        print("")
-        print("# Create client")
-        print("client = DataverseClient(")
-        print('    "https://yourorg.crm.dynamics.com",')
-        print("    credential")
-        print(")")
-        print("")
-        print("# Create a record")
-        print('account_ids = client.create("account", {"name": "Contoso Ltd"})')
-        print("print(f'Created account: {account_ids[0]}')")
-        print("")
-        print("# Query records") 
-        print('accounts = client.get("account", filter="name eq \'Contoso Ltd\'")')
-        print("for batch in accounts:")
-        print("    for record in batch:")
-        print('        print(f"Account: {record[\'name\']}")')
-        print("```")
+        print("  ⚠️  No URL provided, skipping test")
         return
     
     try:
-        # Use DefaultAzureCredential for automatic credential discovery
-        print("🔐 Setting up authentication...")
-        credential = DefaultAzureCredential()
+        from PowerPlatform.Dataverse import DataverseClient
+        from azure.identity import InteractiveBrowserCredential
         
-        # Create the Dataverse client
-        print("🚀 Creating Dataverse client...")
-        client = DataverseClient(org_url, credential)
+        print("  🔐 Setting up authentication...")
+        credential = InteractiveBrowserCredential()
         
-        print("✅ Client created successfully!")
-        print(f"🌐 Connected to: {org_url}")
-        print("\n💡 You can now use the client to:")
-        print("  - Create records: client.create(entity, data)")
-        print("  - Read records: client.get(entity, record_id)")
-        print("  - Update records: client.update(entity, record_id, data)")
-        print("  - Delete records: client.delete(entity, record_id)")
-        print("  - Query with SQL: client.query_sql(sql)")
+        print("  🚀 Creating client...")
+        client = DataverseClient(org_url.rstrip('/'), credential)
         
-        # Optional: Test connection by querying system info
-        try:
-            print("\n🔍 Testing connection...")
-            # Try to get organization info (this should work if authenticated)
-            # Note: This is just a basic connectivity test
-            print("✅ Connection test successful!")
-            
-        except Exception as e:
-            print(f"⚠️  Connection test failed: {e}")
-            print("💡 This might be due to authentication or permissions")
+        print("  🧪 Testing connection...")
+        tables = client.list_tables()
+        
+        print(f"  ✅ Connection successful!")
+        print(f"  📋 Found {len(tables)} tables in environment")
+        print(f"  🌐 Connected to: {org_url}")
+        
+        print("\n  💡 Your SDK is ready for use!")
+        print("  💡 Check the usage examples above for common patterns")
         
     except Exception as e:
-        print(f"❌ Error creating client: {e}")
-        print("💡 Check your org URL and authentication setup")
+        print(f"  ❌ Interactive test failed: {e}")
+        print("  💡 This might be due to authentication, network, or permissions")
+        print("  💡 The SDK imports are still valid for offline development")
+
+
+def main():
+    """Run comprehensive installation validation and demonstration."""
+    print("🚀 PowerPlatform Dataverse Client SDK - Installation & Validation")
+    print("=" * 70)
+    print(f"🕒 Validation Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 70)
+    
+    # Step 1: Validate imports
+    imports_success, version, DataverseClient = validate_imports()
+    if not imports_success:
+        print("\n❌ Import validation failed. Please check installation.")
+        sys.exit(1)
+    
+    # Step 2: Validate client methods
+    if DataverseClient:
+        methods_success = validate_client_methods(DataverseClient)
+        if not methods_success:
+            print("\n⚠️  Some client methods are missing, but basic functionality should work.")
+    
+    # Step 3: Validate package metadata
+    metadata_success = validate_package_metadata()
+    
+    # Step 4: Show usage examples
+    show_usage_examples()
+    
+    # Step 5: Optional interactive testing
+    interactive_test()
+    
+    # Summary
+    print("\n" + "=" * 70)
+    print("📊 VALIDATION SUMMARY")
+    print("=" * 70)
+    
+    results = [
+        ("Package Imports", imports_success),
+        ("Client Methods", methods_success if 'methods_success' in locals() else True),
+        ("Package Metadata", metadata_success)
+    ]
+    
+    all_passed = True
+    for test_name, success in results:
+        status = "✅ PASS" if success else "❌ FAIL" 
+        print(f"{test_name:<20} {status}")
+        if not success:
+            all_passed = False
+    
+    print("=" * 70)
+    if all_passed:
+        print("🎉 SUCCESS: PowerPlatform-Dataverse-Client is properly installed!")
+        if version:
+            print(f"📦 Package Version: {version}")
+        print("\n💡 What this validates:")
+        print("  ✅ Package installation is correct")
+        print("  ✅ All namespace imports work")  
+        print("  ✅ Client classes are accessible")
+        print("  ✅ Package metadata is valid")
+        print("  ✅ Ready for development and production use")
+        
+        print(f"\n🎯 Next Steps:")
+        print("  • Review the usage examples above")
+        print("  • Configure your Azure Identity credentials")  
+        print("  • Start building with PowerPlatform.Dataverse!")
+        
+    else:
+        print("❌ Some validation checks failed!")
+        print("💡 Review the errors above and reinstall if needed:")
+        print("   pip uninstall PowerPlatform-Dataverse-Client")
+        print("   pip install PowerPlatform-Dataverse-Client")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

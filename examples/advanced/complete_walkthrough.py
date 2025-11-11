@@ -2,15 +2,30 @@
 # Licensed under the MIT license.
 
 """
-PowerPlatform Dataverse Client - Basic Quickstart Example
+PowerPlatform Dataverse Client - Complete SDK Walkthrough
 
-This example demonstrates basic usage of the PowerPlatform-Dataverse-Client SDK.
+This comprehensive example demonstrates advanced usage of the PowerPlatform-Dataverse-Client SDK
+including all major features and production-ready patterns.
+
+Features Demonstrated:
+- Authentication setup and connection management
+- Table creation with custom schemas and enums
+- Single and bulk record operations (CRUD)
+- Advanced querying with SQL and OData
+- Paging and batch processing
+- Column metadata management
+- Multi-language label support
+- Error handling and retry patterns
+- Interactive cleanup options
 
 Prerequisites:
     pip install PowerPlatform-Dataverse-Client
     pip install azure-identity
 
 For local development, you can also run from source by uncommenting the sys.path line below.
+
+Note: This is a comprehensive demonstration. For basic installation validation,
+      use examples/basic/installation_example.py first.
 """
 
 import sys
