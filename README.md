@@ -89,13 +89,13 @@ client = DataverseClient(base_url=base_url, credential=credential)
 
 ## Quickstart
 
-Edit `examples/quickstart.py` and run:
+For a comprehensive walkthrough, edit `examples/advanced/complete_walkthrough.py` and run:
 
 ```powershell
-python examples/quickstart.py
+python examples/advanced/complete_walkthrough.py
 ```
 
-The quickstart demonstrates:
+The walkthrough demonstrates:
 - Creating a simple custom table (metadata APIs)
 - Creating, reading, updating, and deleting records (OData)
 - Bulk create (CreateMultiple) to insert many records in one call
@@ -103,7 +103,7 @@ The quickstart demonstrates:
 - Retrieve multiple with paging (`$top` vs `page_size`)
 - Executing a read-only SQL query (Web API `?sql=`)
 
-For upload files functionalities, run quickstart_file_upload.py instead
+For upload files functionalities, run `examples/advanced/file_upload.py` instead
 
 ## Examples
 
@@ -343,7 +343,7 @@ Notes:
 
 ### Pandas helpers
 
-`PandasODataClient` is a thin wrapper around the low-level client. All methods accept logical (singular) names (e.g. `account`, `new_sampleitem`), not entity set (plural) names. See `examples/quickstart_pandas.py` for a DataFrame workflow.
+`PandasODataClient` is a thin wrapper around the low-level client. All methods accept logical (singular) names (e.g. `account`, `new_sampleitem`), not entity set (plural) names. See `examples/advanced/pandas_integration.py` for a DataFrame workflow.
 
 VS Code Tasks
 - Install deps: `Install deps (pip)`
