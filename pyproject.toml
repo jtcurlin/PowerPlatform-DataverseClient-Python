@@ -80,7 +80,7 @@ line-length = 120
 target-version = "py310"
 select = [
     "E", "W",  # pycodestyle
-    "F",       # pyflakes  
+    "F",       # pyflakes
     "I",       # isort
     "N",       # pep8-naming
     "UP",      # pyupgrade
