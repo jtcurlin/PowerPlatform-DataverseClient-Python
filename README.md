@@ -100,7 +100,7 @@ The SDK provides a simple, pythonic interface for Dataverse operations:
 | **DataverseClient** | Main entry point for all operations with environment connection |
 | **Records** | Dataverse records represented as Python dictionaries with logical field names |
 | **Logical Names** | Use table logical names (`"account"`) and column logical names (`"name"`) |  
-| **Bulk Operations** | Efficient batch processing for multiple records with automatic optimization |
+| **Batch Operations** | Efficient batch processing for multiple records with automatic optimization |
 | **Paging** | Automatic handling of large result sets with iterators |
 | **Structured Errors** | Detailed exception hierarchy with retry guidance and diagnostic information |
 
