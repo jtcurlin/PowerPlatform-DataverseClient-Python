@@ -1,0 +1,33 @@
+# CODEOWNERS for Dataverse Client Python SDK
+# This file defines who gets automatically requested for review when PRs are opened.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global ownership - fallback for any files not covered by more specific rules
+* @microsoft/powerplatform-dataverseclient-python-maintainers
+#   Team is found here:
+#   https://github.com/orgs/microsoft/teams/powerplatform-dataverseclient-python-maintainers
+
+# Core SDK components - require maintainer review
+/src/dataverse_sdk/ @microsoft/powerplatform-dataverseclient-python-maintainers
+
+# Security-sensitive authentication code
+/src/dataverse_sdk/auth.py @microsoft/powerplatform-dataverseclient-python-maintainers @microsoft/security
+
+# Build and packaging configuration
+/pyproject.toml @microsoft/powerplatform-dataverseclient-python-maintainers
+/requirements.txt @microsoft/powerplatform-dataverseclient-python-maintainers
+/dev_dependencies.txt @microsoft/powerplatform-dataverseclient-python-maintainers
+
+# CI/CD and automation
+/.github/workflows/ @microsoft/powerplatform-dataverseclient-python-maintainers
+/.github/dependabot.yml @microsoft/security
+
+# Documentation
+/README.md @microsoft/powerplatform-dataverseclient-python-maintainers
+/docs/ @microsoft/powerplatform-dataverseclient-python-maintainers
+/examples/ @microsoft/powerplatform-dataverseclient-python-maintainers
+
+# Legal and compliance
+/LICENSE @microsoft/opensource
+/CODE_OF_CONDUCT.md @microsoft/opensource
+/SECURITY.md @microsoft/security
