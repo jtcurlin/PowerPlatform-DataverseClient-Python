@@ -38,10 +38,6 @@ dependencies = [
 "Issues" = "https://github.com/microsoft/PowerPlatform-DataverseClient-Python/issues"
 "Documentation" = "https://github.com/microsoft/PowerPlatform-DataverseClient-Python#readme"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-zip-safe = false
-
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
