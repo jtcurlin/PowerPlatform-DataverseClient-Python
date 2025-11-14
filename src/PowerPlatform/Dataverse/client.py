@@ -134,7 +134,7 @@ class DataverseClient:
                 print(f"Created {len(ids)} accounts")
         """
         od = self._get_odata()
-        entity_set = od._entity_set_from_logical(table_schema_name)
+        entity_set = od._entity_set_from_schema_name(table_schema_name)
         if isinstance(records, dict):
             rid = od._create(entity_set, table_schema_name, records)
             # _create returns str on single input
@@ -420,7 +420,7 @@ class DataverseClient:
     def create_table(
         self,
         table_schema_name: str,
-        schema: Dict[str, Any],
+        columns: Dict[str, Any],
         solution_unique_name: Optional[str] = None,
         primary_column_schema_name: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -491,7 +491,7 @@ class DataverseClient:
         """
         return self._get_odata()._create_table(
             table_schema_name,
-            schema,
+            columns,
             solution_unique_name,
             primary_column_schema_name,
         )
@@ -662,7 +662,7 @@ class DataverseClient:
                 )
         """
         od = self._get_odata()
-        entity_set = od._entity_set_from_logical(table_schema_name)
+        entity_set = od._entity_set_from_schema_name(table_schema_name)
         od.upload_file(
             entity_set,
             record_id,

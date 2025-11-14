@@ -80,14 +80,14 @@ def main():
         print(f"  Entity Set: {table_info.get('entity_set_name')}")
     else:
         log_call(f"client.create_table('{table_name}', schema={{...}})")
-        schema = {
+        columns = {
             "new_Title": "string",
             "new_Quantity": "int",
             "new_Amount": "decimal",
             "new_Completed": "bool",
             "new_Priority": Priority
         }
-        table_info = client.create_table(table_name, schema)
+        table_info = client.create_table(table_name, columns)
         print(f"✓ Created table: {table_info.get('table_schema_name')}")
         print(f"  Columns created: {', '.join(table_info.get('columns_created', []))}")
 

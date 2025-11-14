@@ -104,7 +104,7 @@ The SDK provides a simple, pythonic interface for Dataverse operations:
 | **Bulk Operations** | Efficient bulk processing for multiple records with automatic optimization |
 | **Paging** | Automatic handling of large result sets with iterators |
 | **Structured Errors** | Detailed exception hierarchy with retry guidance and diagnostic information |
-| **Customization prefix values** | Custom tables and columns require a customization prefix values to be included for all operations (e.g., `"new_Title"`, not `"Title"`). See: [Table definitions in Microsoft Dataverse](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-metadata) |
+| **Customization prefix values** | Custom tables and columns require a customization prefix value to be included for all operations (e.g., `"new_Title"`, not `"Title"`). See: [Table definitions in Microsoft Dataverse](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-metadata) |
 
 ## Examples
 

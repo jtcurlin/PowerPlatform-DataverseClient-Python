@@ -96,7 +96,7 @@ def ensure_test_table(client: DataverseClient) -> Dict[str, Any]:
         table_info = client.create_table(
             table_schema_name,
             primary_column_schema_name="test_name",
-            schema=
+            columns=
             {
                 "test_description": "string",   # Description field
                 "test_count": "int",            # Integer field

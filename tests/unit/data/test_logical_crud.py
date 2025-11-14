@@ -77,7 +77,7 @@ def test_single_create_update_delete_get():
         (204, {}, {}),  # delete
     ]
     c = TestableClient(responses)
-    entity_set = c._entity_set_from_logical("account")
+    entity_set = c._entity_set_from_schema_name("account")
     rid = c._create(entity_set, "account", {"name": "Acme"})
     assert rid == guid
     rec = c._get("account", rid, select="accountid,name")
@@ -97,7 +97,7 @@ def test_bulk_create_and_update():
         (204, {}, {}),  # UpdateMultiple 1:1
     ]
     c = TestableClient(responses)
-    entity_set = c._entity_set_from_logical("account")
+    entity_set = c._entity_set_from_schema_name("account")
     ids = c._create_multiple(entity_set, "account", [{"name": "A"}, {"name": "B"}])
     assert ids == [g1, g2]
     c._update_by_ids("account", ids, {"statecode": 1})  # broadcast
@@ -122,4 +122,4 @@ def test_unknown_logical_name_raises():
     ]
     c = TestableClient(responses)
     with pytest.raises(MetadataError):
-        c._entity_set_from_logical("nonexistent")
+        c._entity_set_from_schema_name("nonexistent")

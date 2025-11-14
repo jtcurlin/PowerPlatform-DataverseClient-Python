@@ -278,7 +278,7 @@ class ODataClient(ODataFileUpload):
         if pid:
             return pid
         # Resolve metadata (populates _logical_primaryid_cache or raises if table_schema_name unknown)
-        self._entity_set_from_logical(table_schema_name)
+        self._entity_set_from_schema_name(table_schema_name)
         pid2 = self._logical_primaryid_cache.get(cache_key)
         if pid2:
             return pid2
@@ -303,7 +303,7 @@ class ODataClient(ODataFileUpload):
         if not ids:
             return None
         pk_attr = self._primary_id_attr(table_schema_name)
-        entity_set = self._entity_set_from_logical(table_schema_name)
+        entity_set = self._entity_set_from_schema_name(table_schema_name)
         if isinstance(changes, dict):
             batch = [{pk_attr: rid, **changes} for rid in ids]
             self._update_multiple(entity_set, table_schema_name, batch)
@@ -420,7 +420,7 @@ class ODataClient(ODataFileUpload):
         # Lowercase all keys to match Dataverse LogicalName expectations
         data = self._lowercase_keys(data)
         data = self._convert_labels_to_ints(table_schema_name, data)
-        entity_set = self._entity_set_from_logical(table_schema_name)
+        entity_set = self._entity_set_from_schema_name(table_schema_name)
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         r = self._request("patch", url, headers={"If-Match": "*"}, json=data)
 
@@ -481,7 +481,7 @@ class ODataClient(ODataFileUpload):
 
     def _delete(self, table_schema_name: str, key: str) -> None:
         """Delete a record by GUID or alternate key."""
-        entity_set = self._entity_set_from_logical(table_schema_name)
+        entity_set = self._entity_set_from_schema_name(table_schema_name)
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         self._request("delete", url, headers={"If-Match": "*"})
 
@@ -501,7 +501,7 @@ class ODataClient(ODataFileUpload):
         if select:
             # Lowercase column names for case-insensitive matching
             params["$select"] = select.lower()
-        entity_set = self._entity_set_from_logical(table_schema_name)
+        entity_set = self._entity_set_from_schema_name(table_schema_name)
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         r = self._request("get", url, params=params)
         return r.json()
@@ -557,7 +557,7 @@ class ODataClient(ODataFileUpload):
             except ValueError:
                 return {}
 
-        entity_set = self._entity_set_from_logical(table_schema_name)
+        entity_set = self._entity_set_from_schema_name(table_schema_name)
         base_url = f"{self.api}/{entity_set}"
         params: Dict[str, Any] = {}
         if select:
@@ -627,7 +627,7 @@ class ODataClient(ODataFileUpload):
         # Extract logical table name via helper (robust to identifiers ending with 'from')
         logical = self._extract_logical_table(sql)
 
-        entity_set = self._entity_set_from_logical(logical)
+        entity_set = self._entity_set_from_schema_name(logical)
         # Issue GET /{entity_set}?sql=<query>
         url = f"{self.api}/{entity_set}"
         params = {"sql": sql}
@@ -666,7 +666,7 @@ class ODataClient(ODataFileUpload):
         return m.group(1).lower()
 
     # ---------------------- Entity set resolution -----------------------
-    def _entity_set_from_logical(self, logical: str) -> str:
+    def _entity_set_from_schema_name(self, logical: str) -> str:
         """Resolve entity set name (plural) from a logical (singular) name using metadata.
 
         Caches results for subsequent queries. Case-insensitive.
