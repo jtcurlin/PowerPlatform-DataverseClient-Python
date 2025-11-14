@@ -17,7 +17,18 @@ import importlib.resources as ir
 from ..core.http import HttpClient
 from .upload import ODataFileUpload
 from ..core.errors import *
-from ..core import error_codes as ec
+from ..core.error_codes import (
+    http_subcode, 
+    is_transient_status,
+    VALIDATION_SQL_NOT_STRING,
+    VALIDATION_SQL_EMPTY,
+    METADATA_ENTITYSET_NOT_FOUND,
+    METADATA_ENTITYSET_NAME_MISSING,
+    METADATA_TABLE_NOT_FOUND,
+    METADATA_TABLE_ALREADY_EXISTS,
+    METADATA_COLUMN_NOT_FOUND,
+    VALIDATION_UNSUPPORTED_CACHE_KIND,
+)
 
 from ..__version__ import __version__ as _SDK_VERSION
 
@@ -147,7 +158,7 @@ class ODataClient(ODataFileUpload):
         except Exception:
             pass
         sc = r.status_code
-        subcode = ec.http_subcode(sc)
+        subcode = http_subcode(sc)
         correlation_id = headers.get("x-ms-correlation-request-id") or headers.get("x-ms-correlation-id")
         request_id = headers.get("x-ms-client-request-id") or headers.get("request-id") or headers.get("x-ms-request-id")
         traceparent = headers.get("traceparent")
@@ -158,7 +169,7 @@ class ODataClient(ODataFileUpload):
                 retry_after = int(ra)
             except Exception:
                 retry_after = None
-        is_transient = ec.is_transient_status(sc)
+        is_transient = is_transient_status(sc)
         raise HttpError(
             msg,
             status_code=sc,
@@ -487,15 +498,15 @@ class ODataClient(ODataFileUpload):
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         self._request("delete", url, headers={"If-Match": "*"})
 
-    def _get(self, table_schema_name: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
+    def _get(self, table_schema_name: str, key: str, select: Optional[List[str]] = None) -> Dict[str, Any]:
         """Retrieve a single record.
 
         :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param key: Record GUID (with or without parentheses).
         :type key: ``str``
-        :param select: Comma separated columns for ``$select`` (optional).
-        :type select: ``str`` | ``None``
+        :param select: Columns to select; joined with commas into $select.
+        :type select: ``list[str]`` | ``None``
 
         :return: Retrieved record dictionary (may be empty if no selected attributes).
         :rtype: ``dict[str, Any]``
@@ -503,7 +514,7 @@ class ODataClient(ODataFileUpload):
         params = {}
         if select:
             # Lowercase column names for case-insensitive matching
-            params["$select"] = select.lower()
+            params["$select"] = ",".join(select)
         entity_set = self._entity_set_from_schema_name(table_schema_name)
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         r = self._request("get", url, params=params)
@@ -605,9 +616,9 @@ class ODataClient(ODataFileUpload):
            Endpoint form: ``GET /{entity_set}?sql=<encoded select>``. The client extracts the logical table name, resolves the entity set (metadata cached), then issues the request. Only a constrained SELECT subset is supported by the platform.
         """
         if not isinstance(sql, str):
-            raise ValidationError("sql must be a string", subcode=ec.VALIDATION_SQL_NOT_STRING)
+            raise ValidationError("sql must be a string", subcode=VALIDATION_SQL_NOT_STRING)
         if not sql.strip():
-            raise ValidationError("sql must be a non-empty string", subcode=ec.VALIDATION_SQL_EMPTY)
+            raise ValidationError("sql must be a non-empty string", subcode=VALIDATION_SQL_EMPTY)
         sql = sql.strip()
 
         # Extract logical table name via helper (robust to identifiers ending with 'from')
@@ -683,14 +694,14 @@ class ODataClient(ODataFileUpload):
             plural_hint = " (did you pass a plural entity set name instead of the singular table schema name?)" if table_schema_name.endswith("s") and not table_schema_name.endswith("ss") else ""
             raise MetadataError(
                 f"Unable to resolve entity set for table schema name '{table_schema_name}'. Provide the singular table schema name.{plural_hint}",
-                subcode=ec.METADATA_ENTITYSET_NOT_FOUND,
+                subcode=METADATA_ENTITYSET_NOT_FOUND,
             )
         md = items[0]
         es = md.get("EntitySetName")
         if not es:
             raise MetadataError(
                 f"Metadata response missing EntitySetName for table schema name '{table_schema_name}'.",
-                subcode=ec.METADATA_ENTITYSET_NAME_MISSING,
+                subcode=METADATA_ENTITYSET_NAME_MISSING,
             )
         self._logical_to_entityset_cache[cache_key] = es
         primary_id_attr = md.get("PrimaryIdAttribute")
@@ -1195,7 +1206,7 @@ class ODataClient(ODataFileUpload):
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",
-                subcode=ec.METADATA_TABLE_NOT_FOUND,
+                subcode=METADATA_TABLE_NOT_FOUND,
             )
         metadata_id = ent["MetadataId"]
         url = f"{self.api}/EntityDefinitions({metadata_id})"
@@ -1232,7 +1243,7 @@ class ODataClient(ODataFileUpload):
         if ent:
             raise MetadataError(
                 f"Table '{table_schema_name}' already exists.",
-                subcode=ec.METADATA_TABLE_ALREADY_EXISTS,
+                subcode=METADATA_TABLE_ALREADY_EXISTS,
             )
 
         created_cols: List[str] = []
@@ -1301,7 +1312,7 @@ class ODataClient(ODataFileUpload):
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",
-                subcode=ec.METADATA_TABLE_NOT_FOUND,
+                subcode=METADATA_TABLE_NOT_FOUND,
             )
 
         metadata_id = ent.get("MetadataId")
@@ -1362,7 +1373,7 @@ class ODataClient(ODataFileUpload):
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",
-                subcode=ec.METADATA_TABLE_NOT_FOUND,
+                subcode=METADATA_TABLE_NOT_FOUND,
             )
 
         # Use the actual SchemaName from the entity metadata
@@ -1376,7 +1387,7 @@ class ODataClient(ODataFileUpload):
             if not attr_meta:
                 raise MetadataError(
                     f"Column '{column_name}' not found on table '{entity_schema}'.",
-                    subcode=ec.METADATA_COLUMN_NOT_FOUND,
+                    subcode=METADATA_COLUMN_NOT_FOUND,
                 )
 
             attr_metadata_id = attr_meta.get("MetadataId")
@@ -1418,7 +1429,7 @@ class ODataClient(ODataFileUpload):
         if k != "picklist":
             raise ValidationError(
                 f"Unsupported cache kind '{kind}' (only 'picklist' is implemented)",
-                subcode=ec.VALIDATION_UNSUPPORTED_CACHE_KIND,
+                subcode=VALIDATION_UNSUPPORTED_CACHE_KIND,
             )
 
         removed = len(self._picklist_label_cache)
