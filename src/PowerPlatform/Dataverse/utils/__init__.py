@@ -6,8 +6,10 @@ Utilities and adapters for the Dataverse SDK.
 
 This module contains helper functions, adapters (like Pandas integration),
 logging utilities, and validation helpers.
+
+Import classes directly from their specific modules:
+    - Pandas integration: from .pandas_adapter import PandasODataClient
 """
 
-from .pandas_adapter import PandasODataClient
-
-__all__ = ["PandasODataClient"]
+# No re-exports to avoid documentation duplication with py2docfx
+__all__ = []
