@@ -178,7 +178,7 @@ class ODataClient(ODataFileUpload):
 
         :param entity_set: Resolved entity set (plural) name.
         :type entity_set: ``str``
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param record: Attribute payload mapped by logical column names.
         :type record: ``dict[str, Any]``
@@ -215,7 +215,7 @@ class ODataClient(ODataFileUpload):
 
         :param entity_set: Resolved entity set (plural) name.
         :type entity_set: ``str``
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param records: Payload dictionaries mapped by column schema names.
         :type records: ``list[dict[str, Any]]``
@@ -291,7 +291,7 @@ class ODataClient(ODataFileUpload):
     def _update_by_ids(self, table_schema_name: str, ids: List[str], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
         """Update many records by GUID list using the collection-bound ``UpdateMultiple`` action.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param ids: GUIDs of target records.
         :type ids: ``list[str]``
@@ -413,7 +413,7 @@ class ODataClient(ODataFileUpload):
     def _update(self, table_schema_name: str, key: str, data: Dict[str, Any]) -> None:
         """Update an existing record by GUID.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param key: Record GUID (with or without parentheses).
         :type key: ``str``
@@ -434,7 +434,7 @@ class ODataClient(ODataFileUpload):
 
         :param entity_set: Resolved entity set (plural) name.
         :type entity_set: ``str``
-        :param table_schema_name: Table schema name, e.g. "new_MyTestTable".
+        :param table_schema_name: Schema name of the table, e.g. "new_MyTestTable".
         :type table_schema_name: ``str``
         :param records: List of patch dictionaries. Each must include the true primary key attribute (e.g. ``accountid``) and one or more fields to update.
         :type records: ``list[dict[str, Any]]``
@@ -475,7 +475,7 @@ class ODataClient(ODataFileUpload):
     def _delete(self, table_schema_name: str, key: str) -> None:
         """Delete a record by GUID.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param key: Record GUID (with or without parentheses)
         :type key: ``str``
@@ -490,7 +490,7 @@ class ODataClient(ODataFileUpload):
     def _get(self, table_schema_name: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
         """Retrieve a single record.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param key: Record GUID (with or without parentheses).
         :type key: ``str``
@@ -521,17 +521,17 @@ class ODataClient(ODataFileUpload):
     ) -> Iterable[List[Dict[str, Any]]]:
         """Iterate records from an entity set, yielding one page (list of dicts) at a time.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param select: Columns to include (``$select``) or ``None``. Column names are automatically lowercased.
         :type select: ``list[str]`` | ``None``
-        :param filter: OData ``$filter`` expression or ``None``. IMPORTANT: This is passed as-is without transformation. Users must provide lowercase logical column names (e.g., "statecode eq 0").
+        :param filter: OData ``$filter`` expression or ``None``. This is passed as-is without transformation. Users must provide lowercase logical column names (e.g., "statecode eq 0").
         :type filter: ``str`` | ``None``
         :param orderby: Order expressions (``$orderby``) or ``None``. Column names are automatically lowercased.
         :type orderby: ``list[str]`` | ``None``
         :param top: Max total records (applied on first request as ``$top``) or ``None``.
         :type top: ``int`` | ``None``
-        :param expand: Navigation properties to expand (``$expand``) or ``None``. IMPORTANT: These are case-sensitive and passed as-is. Users must provide exact navigation property names from entity metadata.
+        :param expand: Navigation properties to expand (``$expand``) or ``None``. These are case-sensitive and passed as-is. Users must provide exact navigation property names from entity metadata.
         :type expand: ``list[str]`` | ``None``
         :param page_size: Per-page size hint via ``Prefer: odata.maxpagesize``.
         :type page_size: ``int`` | ``None``
@@ -1147,7 +1147,7 @@ class ODataClient(ODataFileUpload):
     def _get_table_info(self, table_schema_name: str) -> Optional[Dict[str, Any]]:
         """Return basic metadata for a custom table if it exists.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
 
         :return: Metadata summary or ``None`` if not found.
@@ -1180,9 +1180,9 @@ class ODataClient(ODataFileUpload):
         return r.json().get("value", [])
 
     def _delete_table(self, table_schema_name: str) -> None:
-        """Delete a table by SchemaName. Case-insensitive.
+        """Delete a table by schema name.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
 
         :return: ``None``
@@ -1210,7 +1210,7 @@ class ODataClient(ODataFileUpload):
     ) -> Dict[str, Any]:
         """Create a custom table with specified columns.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param schema: Mapping of column name -> type spec (``str`` or ``Enum`` subclass).
         :type schema: ``dict[str, Any]``
@@ -1281,7 +1281,7 @@ class ODataClient(ODataFileUpload):
     ) -> List[str]:
         """Create new columns on an existing table.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param columns: Mapping of column schema name -> type spec (``str`` or ``Enum`` subclass).
         :type columns: ``dict[str, Any]``
@@ -1333,7 +1333,7 @@ class ODataClient(ODataFileUpload):
     ) -> List[str]:
         """Delete one or more columns from a table.
 
-        :param table_schema_name: Table schema name.
+        :param table_schema_name: Schema name of the table.
         :type table_schema_name: ``str``
         :param columns: Single column name or list of column names
         :type columns: ``str`` | ``list[str]``

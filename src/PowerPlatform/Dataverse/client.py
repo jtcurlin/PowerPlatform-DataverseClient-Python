@@ -104,7 +104,7 @@ class DataverseClient:
         """
         Create one or more records by table name.
 
-        :param table_schema_name: Table schema name (e.g. ``"account"``, ``"contact"``, or ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"account"``, ``"contact"``, or ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param records: A single record dictionary or a list of record dictionaries.
             Each dictionary should contain column schema names as keys.
@@ -157,7 +157,7 @@ class DataverseClient:
         2. Broadcast update: ``update("account", [id1, id2], {"status": 1})`` - applies same changes to all IDs
         3. Paired updates: ``update("account", [id1, id2], [changes1, changes2])`` - one-to-one mapping
 
-        :param table_schema_name:  Table schema name (e.g. ``"account"`` or ``"new_MyTestTable"``).
+        :param table_schema_name:  Schema name of the table (e.g. ``"account"`` or ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param ids: Single GUID string or list of GUID strings to update.
         :type ids: ``str`` or ``list[str]``
@@ -210,7 +210,7 @@ class DataverseClient:
         """
         Delete one or more records by GUID.
 
-        :param table_schema_name: Table schema name (e.g. ``"account"`` or ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"account"`` or ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param ids: Single GUID string or list of GUID strings to delete.
         :type ids: ``str`` or ``list[str]``
@@ -266,19 +266,19 @@ class DataverseClient:
         When ``record_id`` is provided, returns a single record dictionary.
         When ``record_id`` is None, returns a generator yielding batches of records.
 
-        :param table_schema_name: Table schema name (e.g. ``"account"`` or ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"account"`` or ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param record_id: Optional GUID to fetch a specific record. If None, queries multiple records.
         :type record_id: ``str`` or ``None``
         :param select: Optional list of attribute logical names to retrieve. Column names are case-insensitive and automatically lowercased (e.g. ``["new_Title", "new_Amount"]`` becomes ``"new_title,new_amount"``).
         :type select: ``list[str]`` or ``None``
-        :param filter: Optional OData filter string, e.g. ``"name eq 'Contoso'"`` or ``"new_quantity gt 5"``. **IMPORTANT: Column names in filter expressions must use exact lowercase logical names** (e.g. ``"new_quantity"``, not ``"new_Quantity"``). The filter string is passed directly to the Dataverse Web API without transformation.
+        :param filter: Optional OData filter string, e.g. ``"name eq 'Contoso'"`` or ``"new_quantity gt 5"``. Column names in filter expressions must use exact lowercase logical names (e.g. ``"new_quantity"``, not ``"new_Quantity"``). The filter string is passed directly to the Dataverse Web API without transformation.
         :type filter: ``str`` or ``None``
         :param orderby: Optional list of attributes to sort by, e.g. ``["name asc", "createdon desc"]``. Column names are automatically lowercased.
         :type orderby: ``list[str]`` or ``None``
         :param top: Optional maximum number of records to return.
         :type top: ``int`` or ``None``
-        :param expand: Optional list of navigation properties to expand, e.g. ``["primarycontactid"]``. **IMPORTANT: Navigation property names are case-sensitive and must match the server-defined  names exactly.**. These are NOT automatically transformed. Consult entity metadata for correct casing.
+        :param expand: Optional list of navigation properties to expand, e.g. ``["primarycontactid"]``. Navigation property names are case-sensitive and must match the server-defined  names exactly. These are NOT automatically transformed. Consult entity metadata for correct casing.
         :type expand: ``list[str]`` or ``None``
         :param page_size: Optional number of records per page for pagination.
         :type page_size: ``int`` or ``None``
@@ -386,7 +386,7 @@ class DataverseClient:
         """
         Get basic metadata for a table if it exists.
 
-        :param table_schema_name: Table schema name (e.g. ``"new_MyTestTable"`` or ``"account"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"new_MyTestTable"`` or ``"account"``).
         :type table_schema_name: ``str``
 
         :return: Dictionary containing table metadata with keys ``table_schema_name``,
@@ -414,7 +414,7 @@ class DataverseClient:
         """
         Create a simple custom table with specified columns.
 
-        :param table_schema_name: Table schema name with customization prefix value (e.g. ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table with customization prefix value (e.g. ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param columns: Dictionary mapping column names (with customization prefix value) to their types. All custom column names must include the customization prefix value (e.g. ``"new_Title"``).
             Supported types:
@@ -431,7 +431,7 @@ class DataverseClient:
                           1036: {"Active": "Actif", "Inactive": "Inactif"}
                       }
 
-        :type schema: dict[str, Any]
+        :type columns: dict[str, Any]
         :param solution_unique_name: Optional solution unique name that should own the new table. When omitted the table is created in the default solution.
         :type solution_unique_name: ``str`` or ``None``
         :param primary_column_schema_name: Optional primary name column schema name with customization prefix value (e.g. ``"new_MyTestTable"``). If not provided, defaults to ``"{customization prefix value}_Name"``.
@@ -483,7 +483,7 @@ class DataverseClient:
         """
         Delete a custom table by name.
 
-        :param table_schema_name: Table schema name (e.g. ``"new_MyTestTable"`` or ``"account"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"new_MyTestTable"`` or ``"account"``).
         :type table_schema_name: ``str``
 
         :raises ~PowerPlatform.Dataverse.core.errors.MetadataError: If the table does not exist or deletion fails.
@@ -523,7 +523,7 @@ class DataverseClient:
         """
         Create one or more columns on an existing table using a schema-style mapping.
 
-        :param table_schema_name: Table schema name (e.g. ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param columns: Mapping of column schema names (with customization prefix value) to supported types. All custom column names must include the customization prefix value** (e.g. ``"new_Notes"``). Primitive types include
             ``string``, ``int``, ``decimal``, ``float``, ``datetime``, and ``bool``. Enum subclasses (IntEnum preferred)
@@ -556,7 +556,7 @@ class DataverseClient:
         """
         Delete one or more columns from a table.
 
-        :param table_schema_name: Table schema name (e.g. ``"new_MyTestTable"``).
+        :param table_schema_name: Schema name of the table (e.g. ``"new_MyTestTable"``).
         :type table_schema_name: ``str``
         :param columns: Column name or list of column names to remove. Must include customization prefix value (e.g. ``"new_TestColumn"``).
         :type columns: ``str`` | ``list[str]``
@@ -590,7 +590,7 @@ class DataverseClient:
         """
         Upload a file to a Dataverse file column.
 
-        :param table_schema_name: Table schema name, e.g. ``"account"`` or ``"new_MyTestTable"``.
+        :param table_schema_name: Schema name of the table, e.g. ``"account"`` or ``"new_MyTestTable"``.
         :type table_schema_name: ``str``
         :param record_id: GUID of the target record.
         :type record_id: ``str``

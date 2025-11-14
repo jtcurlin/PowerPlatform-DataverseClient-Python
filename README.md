@@ -100,7 +100,7 @@ The SDK provides a simple, pythonic interface for Dataverse operations:
 |---------|-------------|
 | **DataverseClient** | Main entry point for all operations with environment connection |
 | **Records** | Dataverse records represented as Python dictionaries with column schema names |
-| **Schema Names** | Use table schema names (`"account"`, `"new_MyTestTable"`) and column schema names (`"name"`, `"new_MyTestColumn"`). See: [Table definitions in Microsoft Dataverse](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-metadata) |  
+| **Schema names** | Use table schema names (`"account"`, `"new_MyTestTable"`) and column schema names (`"name"`, `"new_MyTestColumn"`). See: [Table definitions in Microsoft Dataverse](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-metadata) |  
 | **Bulk Operations** | Efficient bulk processing for multiple records with automatic optimization |
 | **Paging** | Automatic handling of large result sets with iterators |
 | **Structured Errors** | Detailed exception hierarchy with retry guidance and diagnostic information |
