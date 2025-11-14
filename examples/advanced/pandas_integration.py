@@ -69,15 +69,15 @@ table_info = None
 created_this_run = False
 
 # First check for existing table
-existing = client.get_table_info("SampleItem")
+existing = client.get_table_info("new_SampleItem")
 if existing:
 	table_info = existing
 	created_this_run = False
 	print({
-		"table": table_info.get("entity_schema"),
+		"table": table_info.get("table_schema_name"),
 		"existed": True,
 		"entity_set": table_info.get("entity_set_name"),
-		"logical": table_info.get("entity_logical_name"),
+		"logical": table_info.get("table_logical_name"),
 		"metadata_id": table_info.get("metadata_id"),
 	})
 
@@ -85,21 +85,21 @@ else:
 	# Create it since it doesn't exist
 	try:
 		table_info = client.create_table(
-			"SampleItem",
+			"new_SampleItem",
 			{
-				"code": "string",
-				"count": "int",
-				"amount": "decimal",
-				"when": "datetime",
-				"active": "bool",
+				"new_Code": "string",
+				"new_Count": "int",
+				"new_Amount": "decimal",
+				"new_When": "datetime",
+				"new_Active": "bool",
 			},
 		)
 		created_this_run = True if table_info and table_info.get("columns_created") else False
 		print({
-			"table": table_info.get("entity_schema") if table_info else None,
+			"table": table_info.get("table_schema_name") if table_info else None,
 			"existed": False,
 			"entity_set": table_info.get("entity_set_name") if table_info else None,
-			"logical": table_info.get("entity_logical_name") if table_info else None,
+			"logical": table_info.get("table_logical_name") if table_info else None,
 			"metadata_id": table_info.get("metadata_id") if table_info else None,
 		})
 	except Exception as e:
@@ -119,7 +119,7 @@ else:
 		# Fail fast: all operations must use the custom table
 		sys.exit(1)
 
-logical = table_info.get("entity_logical_name")
+logical = table_info.get("table_logical_name")
 # Derive attribute logical name prefix from the entity logical name
 attr_prefix = logical.split("_", 1)[0] if "_" in logical else logical
 record_data = {
@@ -232,9 +232,9 @@ except Exception as e:
 print("Cleanup (Metadata):")
 try:
 	# Delete if present, regardless of whether it was created in this run
-	info = client.get_table_info("SampleItem")
+	info = client.get_table_info("new_SampleItem")
 	if info:
-		client.delete_table("SampleItem")
+		client.delete_table("new_SampleItem")
 		print({"table_deleted": True})
 	else:
 		print({"table_deleted": False, "reason": "not found"})

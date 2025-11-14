@@ -38,7 +38,7 @@ class MockableClient(ODataClient):
     def __init__(self, responses):
         super().__init__(DummyAuth(), "https://org.example", None)
         self._http = DummyHTTPClient(responses)
-    def _convert_labels_to_ints(self, logical_name, record):  # pragma: no cover - test shim
+    def _convert_labels_to_ints(self, table_schema_name, record):  # pragma: no cover - test shim
         return record
 
 # Helper metadata response for logical name resolution
@@ -77,7 +77,7 @@ def test_single_create_update_delete_get():
         (204, {}, {}),  # delete
     ]
     c = MockableClient(responses)
-    entity_set = c._entity_set_from_logical("account")
+    entity_set = c._entity_set_from_schema_name("account")
     rid = c._create(entity_set, "account", {"name": "Acme"})
     assert rid == guid
     rec = c._get("account", rid, select=["accountid", "name"])
@@ -97,7 +97,7 @@ def test_bulk_create_and_update():
         (204, {}, {}),  # UpdateMultiple 1:1
     ]
     c = MockableClient(responses)
-    entity_set = c._entity_set_from_logical("account")
+    entity_set = c._entity_set_from_schema_name("account")
     ids = c._create_multiple(entity_set, "account", [{"name": "A"}, {"name": "B"}])
     assert ids == [g1, g2]
     c._update_by_ids("account", ids, {"statecode": 1})  # broadcast
@@ -116,10 +116,10 @@ def test_get_multiple_paging():
     assert pages == [[{"accountid": "1"}], [{"accountid": "2"}]]
 
 
-def test_unknown_logical_name_raises():
+def test_unknown_table_schema_name_raises():
     responses = [
         (200, {}, {"value": []}),  # metadata lookup returns empty
     ]
     c = MockableClient(responses)
     with pytest.raises(MetadataError):
-        c._entity_set_from_logical("nonexistent")
+        c._entity_set_from_schema_name("nonexistent")
