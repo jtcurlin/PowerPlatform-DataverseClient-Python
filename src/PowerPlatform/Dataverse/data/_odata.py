@@ -5,14 +5,18 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List, Union, Iterable
+from typing import Any, Dict, Optional, List, Union, Iterable, Callable
 from enum import Enum
+from dataclasses import dataclass, field
 import unicodedata
 import time
 import re
 import json
+import uuid
 from datetime import datetime, timezone
 import importlib.resources as ir
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from ..core._http import _HttpClient
 from ._upload import _ODataFileUpload
@@ -35,6 +39,42 @@ from ..__version__ import __version__ as _SDK_VERSION
 
 _USER_AGENT = f"DataverseSvcPythonClient:{_SDK_VERSION}"
 _GUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+_CALL_SCOPE_CORRELATION_ID: ContextVar[Optional[str]] = ContextVar("_CALL_SCOPE_CORRELATION_ID", default=None)
+_DEFAULT_EXPECTED_STATUSES: tuple[int, ...] = (200, 201, 202, 204)
+
+
+@dataclass
+class _RequestContext:
+    """Structured request context used by ``_request`` to clarify payload and metadata."""
+
+    method: str
+    url: str
+    expected: tuple[int, ...] = _DEFAULT_EXPECTED_STATUSES
+    headers: Optional[Dict[str, str]] = None
+    kwargs: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def build(
+        cls,
+        method: str,
+        url: str,
+        *,
+        expected: tuple[int, ...] = _DEFAULT_EXPECTED_STATUSES,
+        merge_headers: Optional[Callable[[Optional[Dict[str, str]]], Dict[str, str]]] = None,
+        **kwargs: Any,
+    ) -> "_RequestContext":
+        headers = kwargs.get("headers")
+        headers = merge_headers(headers) if merge_headers else (headers or {})
+        headers.setdefault("x-ms-client-request-id", str(uuid.uuid4()))
+        headers.setdefault("x-ms-correlation-id", _CALL_SCOPE_CORRELATION_ID.get())
+        kwargs["headers"] = headers
+        return cls(
+            method=method,
+            url=url,
+            expected=expected,
+            headers=headers,
+            kwargs=kwargs or {},
+        )
 
 
 class _ODataClient(_ODataFileUpload):
@@ -113,6 +153,16 @@ class _ODataClient(_ODataFileUpload):
         self._picklist_label_cache = {}
         self._picklist_cache_ttl_seconds = 3600  # 1 hour TTL
 
+    @contextmanager
+    def _call_scope(self):
+        """Context manager to generate a new correlation id for each SDK call scope."""
+        shared_id = str(uuid.uuid4())
+        token = _CALL_SCOPE_CORRELATION_ID.set(shared_id)
+        try:
+            yield shared_id
+        finally:
+            _CALL_SCOPE_CORRELATION_ID.reset(token)
+
     def _headers(self) -> Dict[str, str]:
         """Build standard OData headers with bearer auth."""
         scope = f"{self.base_url}/.default"
@@ -137,13 +187,19 @@ class _ODataClient(_ODataFileUpload):
     def _raw_request(self, method: str, url: str, **kwargs):
         return self._http._request(method, url, **kwargs)
 
-    def _request(self, method: str, url: str, *, expected: tuple[int, ...] = (200, 201, 202, 204), **kwargs):
-        headers_in = kwargs.pop("headers", None)
-        kwargs["headers"] = self._merge_headers(headers_in)
-        r = self._raw_request(method, url, **kwargs)
-        if r.status_code in expected:
+    def _request(self, method: str, url: str, *, expected: tuple[int, ...] = _DEFAULT_EXPECTED_STATUSES, **kwargs):
+        request_context = _RequestContext.build(
+            method,
+            url,
+            expected=expected,
+            merge_headers=self._merge_headers,
+            **kwargs,
+        )
+
+        r = self._raw_request(request_context.method, request_context.url, **request_context.kwargs)
+        if r.status_code in request_context.expected:
             return r
-        headers = getattr(r, "headers", {}) or {}
+        response_headers = getattr(r, "headers", {}) or {}
         body_excerpt = (getattr(r, "text", "") or "")[:200]
         svc_code = None
         msg = f"HTTP {r.status_code}"
@@ -164,12 +220,13 @@ class _ODataClient(_ODataFileUpload):
             pass
         sc = r.status_code
         subcode = _http_subcode(sc)
-        correlation_id = headers.get("x-ms-correlation-request-id") or headers.get("x-ms-correlation-id")
         request_id = (
-            headers.get("x-ms-client-request-id") or headers.get("request-id") or headers.get("x-ms-request-id")
+            response_headers.get("x-ms-service-request-id")
+            or response_headers.get("req_id")
+            or response_headers.get("x-ms-request-id")
         )
-        traceparent = headers.get("traceparent")
-        ra = headers.get("Retry-After")
+        traceparent = response_headers.get("traceparent")
+        ra = response_headers.get("Retry-After")
         retry_after = None
         if ra:
             try:
@@ -182,8 +239,13 @@ class _ODataClient(_ODataFileUpload):
             status_code=sc,
             subcode=subcode,
             service_error_code=svc_code,
-            correlation_id=correlation_id,
-            request_id=request_id,
+            correlation_id=request_context.headers.get(
+                "x-ms-correlation-id"
+            ),  # this is a value set on client side, although it's logged on server side too
+            client_request_id=request_context.headers.get(
+                "x-ms-client-request-id"
+            ),  # this is a value set on client side, although it's logged on server side too
+            service_request_id=request_id,
             traceparent=traceparent,
             body_excerpt=body_excerpt,
             retry_after=retry_after,
